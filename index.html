@@ -3,11 +3,42 @@
 <head>
     <meta charset = "UTF-8">
     <title>GeoRondo</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+        <div class="game-container">
+            <h1>GeoRondo</h1>
+            <div class="letter-circles">
+            </div>
+            <div class="stats">
+                <div class="timer">Time: 0.0s</div>
+                <div class="skips">Skips: 3 remaining</div>
+            </div>
+            
+            <div class="question-container">
+                <div class ="question">"Start Game</div>
+                <input type="text" id="answer" placeholder="Type your answer here">
+            </div>
+
+            <div class="button-container">
+                <button id="start-button">Start Game</button>
+                <button id="skip-button">Skip(3 left)</button>
+            </div>
+
+            <div class="leaderboard">
+                <h2>Leaderboard</h2>
+                <table id="leaderboard-table">
+                    <tr>
+                        <th>Rank</th>
+                        <th>Player</th>
+                        <th>Time</th>
+                    </tr>
+                </table>
+            </div>
+        </div>
+        <script src="script.js"></script>
 
 
-    
 </body>
+
 
