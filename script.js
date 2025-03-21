@@ -138,5 +138,74 @@ function startGame() {
 function updateTimer() {
     currentTime = Date.now();
     elapsedTime = (currentTime - startTime)/1000;
-    timerElement.textContent = 'Time: ' + elapsedTime.toFixed(1)
+    timerElement.textContent = 'Time: ' + elapsedTime.toFixed(1);
+    totalTime = elapsedTime;
 }
+function setNextQuestion() {
+    if (currentLetterIndex >= alphabet.length)
+        if (currentLetterIndex >= alphabet.length  && skipsRemaining ==0) {
+            endGame();
+            return;
+        }
+        currentLetter = alphabet[currentLetterIndex]
+        currentQuestion = getRandomQuestion(currentLetter);
+        answerInput.value = '';
+        answerInput.focus();
+}
+function handleAnswer() {
+    if (!gameActive){
+        return;
+    }
+    answer = answerInput.value.trim();
+    if (!answer) {
+        return;
+    }
+    currentLetter = alphabet[currentLetterIndex];
+    if (answer.toUpperCase().startswith(currentLetter)) {
+        letterElements[currentLetterIndex].classList.add('completed');
+        letterElements[currentLetterIndex].style.fontWeight = 'normal';
+        currentLetterIndex++;
+        if(currentLetterIndex < alphabet.length){
+            letterElements[currentLetterIndex].style.fontWeight = 'bold';
+        }
+        setNextQuestion();
+    }
+    else{
+        letterElements[currentLetterIndex].classList.add('incorrect');
+        answerInput.value = '';
+    }
+function handleSkip() {
+    if (skipsRemaining <=0 || !gameActive){
+        return;
+    }
+    skipsRemaining--;
+    skipsElement.textContent = 'Skips remaining: ' + skipsRemaining;
+    skipButton.textContent = "Skip(" + skipsRemaining + " left";
+    letterElements[currentLetterIndex].classList.add('skipped');
+    letterElements[currentLetterIndex].style.fontWeight = 'normal';
+    currentLetterIndex++;
+    if (currentLetterIndex < alphabet.length){
+        letterElements[currentLetterIndex].style.fontWeight = 'bold'
+    }
+    setNextQuestion();
+    if (skipsRemaining =0){
+        skipButton.disabled = true;
+    }
+}
+function endGame() {
+    gameActive = false;
+    clearInterval(timerInterval);
+    questionElement.textContent = 'Game Over! Time = ' + totalTime;
+    answerInput.disabled = true;
+    startButton.textContent = 'Play Again';
+    skipButton.style.display = 'none';
+    completedCount = document.querySelectorAll('.letter.completed').length;
+    playerName = prompt("Enter your name for the leaderboard:", "Player");
+    if (playerName){
+        addToLeaderboard(playerName, totalTime, completedCount);
+    }}
+function addToLeaderboard(name, time, lettersCompleted){
+
+}   
+}
+
