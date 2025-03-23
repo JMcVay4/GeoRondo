@@ -9,6 +9,7 @@ const leaderboardTable = document.getElementById('leaderboard-table');
 
 let alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 let letterElements = [];
+let skippedLetters = [];
 let currentLetterIndex = 0;
 let gameActive = false;
 let startTime = 0;
@@ -20,85 +21,85 @@ let currentQuestion = '';
 
 function initializeQuestions() {
     questionsDatabase = {
-        'A':[
-
+        'A': [
+            { question: "U.S. state where the Ozarks are located", correctAnswer: "Arkansas" },
         ],
-        'B':[
-
+        'B': [
+            { question: "State in northeast Brazil", correctAnswer: "Bahia" },
         ],
-        'C':[
-
+        'C': [
+            { question: "Capital of Venezuela", correctAnswer: "Caracas" },
         ],
-        'D':[
-
+        'D': [
+            { question: "City with the tallest building in the world", correctAnswer: "Dubai" },
         ],
-        'E':[
-
+        'E': [
+            { question: "Only African country with Spanish as its official language", correctAnswer: "Equatorial Guinea" },
         ],
-        'F':[
-
+        'F': [
+            { question: "Largest city in the interior region of Alaska", correctAnswer: "Fairbanks" },
+           
         ],
-        'G':[
-
+        'G': [
+            { question: "Port city in Scotland's western lowlands", correctAnswer: "Glasgow" },
         ],
-        'H':[
-
+        'H': [
+            { question: "U.S. state that Kauai is located in", correctAnswer: "Hawaii" },
         ],
-        'I':[
-
+        'I': [
+            { question: "Spanish Island known for its nightlife and EDM", correctAnswer: "Ibiza" },
         ],
-        'J':[
-
+        'J': [
+            { question: "Saudi Arabian port city on the Red Sea", correctAnswer: "Jeddah" },
         ],
-        'K':[
-
+        'K': [
+            { question: "Country in the Middle East that shares its name with its capital", correctAnswer: "Kuwait" },
         ],
-        'L':[
-
+        'L': [
+            { question: "Country in Europe that shares its name with its capital", correctAnswer: "Luxembourg" },
         ],
-        'M':[
-
+        'M': [
+            { question: "Country with the city of Marrakesh", correctAnswer: "Morocco" },
         ],
-        'N':[
-
+        'N': [
+            { question: "U.S. state where Madison Square Garden is located", correctAnswer: "New York" },
         ],
-        'O':[
-
+        'O': [
+            { question: "Capital city in the midwest of America", correctAnswer: "Omaha" },
         ],
-        'P':[
-
+        'P': [
+            { question: "Europe's largest rice growing region located in Italy", correctAnswer: "Po Valley" },
         ],
-        'Q':[
-
+        'Q': [
+            { question: "City in South America with a population of 2.8 million", correctAnswer: "Quito" },
         ],
-        'R':[
-
+        'R': [
+            { question: "African country bordering Uganda", correctAnswer: "Rwanda" },
         ],
-        'S':[
-
+        'S': [
+            { question: "State in Australia with Alice Springs", correctAnswer: "South Australia" },
         ],
-        'T':[
-
+        'T': [
+            { question: "Australian region that Cradle Mountain is located in", correctAnswer: "Tasmania" },
         ],
-        'U':[
-
+        'U': [
+            { question: "City in southern Argentina known as the gateway to Antarctica", correctAnswer: "Ushuaia" },
         ],
-        'V':[
-
+        'V': [
+            { question: "Largest city in British Columbia", correctAnswer: "Vancouver" },
         ],
-        'W':[
-
+        'W': [
+            { question: "Sits near the North Island's southernmost point in New Zealand", correctAnswer: "Wellington" },
         ],
-        'X':[
-
+        'X': [
+            { question: "Largest city in the world starting with X", correctAnswer: "Xiamen" },
         ],
-        'Y':[
-
+        'Y': [
+            { question: "Merida is located in this Mexican region", correctAnswer: "Yucatan" },
         ],
-        'Z':[
-
-        ],
-
+        'Z': [
+            { question: "City on the Croatian coast in between Zagreb and Split", correctAnswer: "Zadar" },
+        ]
     };
 }
 
@@ -127,32 +128,71 @@ function startGame() {
     skipsElement.textContent = 'Skips: ' + skipsRemaining + ' remaining';
     answerInput.disabled = false;
     answerInput.focus();
+    document.getElementById('submit-button').disabled = false;
     letterElements.forEach(element => {
         element.className = 'letter';
     });
     letterElements[currentLetterIndex].style.fontWeight = 'bold';
     startTime = Date.now();
-    timerInverval = setInterval(updateTimer, 100);
+    totalTime = 150;
+    timerInterval = setInterval(updateTimer, 1000);
+
     setNextQuestion();
 }
 function updateTimer() {
-    currentTime = Date.now();
-    elapsedTime = (currentTime - startTime)/1000;
-    timerElement.textContent = 'Time: ' + elapsedTime.toFixed(1);
-    totalTime = elapsedTime;
+    totalTime--;
+    if(totalTime <=0){
+        clearInterval(timerInterval);
+        endGame();
+    }
+    seconds = totalTime % 60;
+    minutes = Math.floor(totalTime/60);
+    let formattedSeconds;
+    if (seconds < 10) {
+        formattedSeconds = '0' + seconds; 
+    }   
+    else {
+        formattedSeconds = seconds; 
+}
+timerElement.textContent = 'Time: ' + minutes + ':' + seconds;
 }
 function setNextQuestion() {
-    if (currentLetterIndex >= alphabet.length)
-        if (currentLetterIndex >= alphabet.length  && skipsRemaining ==0) {
+    if (currentLetterIndex >= alphabet.length && skippedLetters.length === 0){
             endGame();
             return;
         }
-        currentLetter = alphabet[currentLetterIndex]
-        currentQuestion = getRandomQuestion(currentLetter);
-        answerInput.value = '';
-        answerInput.focus();
+        if (currentLetterIndex >= alphabet.length && skippedLetters.length > 0){
+            for(let i = 0; i < skippedLetters.length; i++) {
+                currentLetterIndex = skippedLetters[i];
+                letterElements[currentLetterIndex].style.fontWeight = 'bold';
+                const currentLetter = alphabet[currentLetterIndex];
+                const savedQuestion = questionsDatabase[currentLetter][0]
+                questionElement.textContent = savedQuestion.question;
+                currentQuestion = savedQuestion;
+                answerInput.value = '';
+                answerInput.focus();
+                return;
+
+            }
+            if(skippedLetters.length ===0){
+                endGame();
+            }
+            return;
+        }
+      
+    const currentLetter = alphabet[currentLetterIndex];
+    const randomQuestion = getRandomQuestion(currentLetter);
+    questionElement.textContent = randomQuestion.question;
+    currentQuestion = randomQuestion;
+    answerInput.value = '';
+    answerInput.focus();
 }
-function handleAnswer() {
+function getRandomQuestion(letter){
+    const questions = questionsDatabase[letter];
+    const randomIndex = Math.floor(Math.random() * questions.length);
+    return questions[randomIndex];
+}
+function handleSubmit() {
     if (!gameActive){
         return;
     }
@@ -160,20 +200,21 @@ function handleAnswer() {
     if (!answer) {
         return;
     }
-    currentLetter = alphabet[currentLetterIndex];
-    if (answer.toUpperCase().startswith(currentLetter)) {
+    correctAnswer = currentQuestion.correctAnswer;
+    if (answer.toUpperCase() === correctAnswer.toUpperCase()) {
         letterElements[currentLetterIndex].classList.add('completed');
         letterElements[currentLetterIndex].style.fontWeight = 'normal';
-        currentLetterIndex++;
-        if(currentLetterIndex < alphabet.length){
-            letterElements[currentLetterIndex].style.fontWeight = 'bold';
-        }
-        setNextQuestion();
     }
     else{
         letterElements[currentLetterIndex].classList.add('incorrect');
-        answerInput.value = '';
     }
+    letterElements[currentLetterIndex].style.fontWeight = 'normal';
+    answerInput.value = '';
+    currentLetterIndex++;
+    setNextQuestion();
+    }
+    
+    
 function handleSkip() {
     if (skipsRemaining <=0 || !gameActive){
         return;
@@ -183,29 +224,81 @@ function handleSkip() {
     skipButton.textContent = "Skip(" + skipsRemaining + " left";
     letterElements[currentLetterIndex].classList.add('skipped');
     letterElements[currentLetterIndex].style.fontWeight = 'normal';
+    skippedLetters.push(currentLetterIndex);
     currentLetterIndex++;
     if (currentLetterIndex < alphabet.length){
-        letterElements[currentLetterIndex].style.fontWeight = 'bold'
+        letterElements[currentLetterIndex].style.fontWeight = 'bold';
     }
     setNextQuestion();
-    if (skipsRemaining =0){
+    if (skipsRemaining ===0){
         skipButton.disabled = true;
     }
 }
 function endGame() {
     gameActive = false;
     clearInterval(timerInterval);
-    questionElement.textContent = 'Game Over! Time = ' + totalTime;
+    questionElement.textContent = 'Game Over! Time = ' + totalTime.toFixed(1);
     answerInput.disabled = true;
+    startButton.style.display = 'inline-block';
     startButton.textContent = 'Play Again';
     skipButton.style.display = 'none';
     completedCount = document.querySelectorAll('.letter.completed').length;
     playerName = prompt("Enter your name for the leaderboard:", "Player");
     if (playerName){
         addToLeaderboard(playerName, totalTime, completedCount);
-    }}
-function addToLeaderboard(name, time, lettersCompleted){
-
-}   
+    }
+    document.querySelector('.leaderboard').style.display = 'block';
 }
+function addToLeaderboard(name, time, lettersCompleted){
+    entry = {name, time, lettersCompleted};
+    let leaderboard = [];
+    if(localStorage.getItem('geoLeaderboard')) {
+        leaderboard = JSON.parse(localStorage.getItem('geoLeaderboard'));
+    }
+    leaderboard.push(entry);
+    leaderboard.sort((a,b) => {
+        if (b.lettersCompleted !== a.lettersCompleted) {
+            return b.lettersCompleted - a.lettersCompleted;
+        }
+        return a.time - b.time;
+    });
+    leaderboard = leaderboard.slice(0,10);
+    localStorage.setItem('geoLeaderboard', JSON.stringify(leaderboard));
+    updateLeaderboardDisplay(leaderboard);
+}   
+function updateLeaderboardDisplay(leaderboard){
+    while(leaderboardTable.rows.length >1){
+        leaderboardTable.deleteRow(1);
+    }
+    leaderboard.forEach((entry, index)=> {
+        row = leaderboardTable.insertRow();
+        rankCell = row.insertCell();
+        rankCell.textContent = index + 1;
+        nameCell = row.insertCell();
+        nameCell.textcontent = entry.name;
+        timeCell = row.insertCell();
+        timeCell.textContent = entry.time.toFixed(1);
+        lettersCell = row.insertCell();
+        lettersCell.textContent = entry.lettersCompleted;
+    });
+}
+function initializeGame() {
+    createLetterCircles();
+    initializeQuestions();
+    let leaderboard = [];
+    if(localStorage.getItem('geoLeaderboard')){
+        leaderboard = JSON.parse(localStorage.getItem('geoLeaderboard'));
+        updateLeaderboardDisplay(leaderboard);
+    }
+    startButton.addEventListener('click', startGame);
+    skipButton.addEventListener('click', handleSkip);
+    document.getElementById('submit-button').addEventListener('click', handleSubmit);
+    answerInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter'){
+            handleSubmit();
+        }
+    });
+}
+window.onload = initializeGame;
+
 
