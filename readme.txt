@@ -23,3 +23,4 @@ FUTURE IDEAS
 - Add more questions
 - Button to clear leaderboard
 - Multiplayer mode/leaderboard
+- Difficulties???
