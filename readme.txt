@@ -15,9 +15,11 @@ Simply open index.html in a browser of your choice.
 
 KNOWN BUGS
 
-- Names do not display on the leaderboard.
+- Names do not display on the leaderboard
+- Play again button does not work
 
 FUTURE IDEAS
 
 - Add more questions
+- Button to clear leaderboard
 - Multiplayer mode/leaderboard
