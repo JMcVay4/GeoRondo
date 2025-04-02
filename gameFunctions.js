@@ -16,9 +16,10 @@ let gameActive = false;
 let startTime = 0;
 let totalTime = 0;
 let timerInterval;
-let skipsRemaining=3
+let skipsRemaining = 3
 let questionsDatabase = {};
 let currentQuestion = '';
+let skipMode = false; // true if the user is now answering skipped questions
 
 // keep track of letter divs in array for easy update
 function createLetterCircles(){
@@ -66,29 +67,25 @@ function updateTimer() {
 }
 
 function setNextQuestion() {
-    if (currentLetterIndex >= alphabet.length && skippedLetters.length === 0){
-        endGame();
-        return;
-    }
-    // handle skipped letters if necessary
-    if (currentLetterIndex >= alphabet.length && skippedLetters.length > 0){
-        for(let i = 0; i < skippedLetters.length; i++) {
-            currentLetterIndex = skippedLetters[i];
-            letterElements[currentLetterIndex].style.fontWeight = 'bold';
+    // handle skipped letters first (or possible game end)
+    if (currentLetterIndex >= alphabet.length || skipMode) {
+        if (skippedLetters.length === 0){
+            endGame();
+            return;
+        }
+        else {
+            skipMode = true;
+            currentLetterIndex = skippedLetters[0];
+            letterElements[currentLetterIndex].classList.remove('skipped');
+            letterElements[currentLetterIndex].classList.add('active');
             const currentLetter = alphabet[currentLetterIndex];
             const savedQuestion = questionsDatabase[currentLetter][0]
             questionElement.textContent = savedQuestion.question;
             currentQuestion = savedQuestion;
             answerInput.value = '';
             answerInput.focus();
-            return;
-
         }
-        if(skippedLetters.length ===0){
-            endGame();
-        }
-        return;
-    }
+    }    
     // handle normal game progression
     const currentLetter = alphabet[currentLetterIndex];
     const randomQuestion = getRandomQuestion(currentLetter);
@@ -107,6 +104,10 @@ function handleSubmit() {
     if (!answer) {
         return;
     }
+    if (answer.toUpperCase() === 'PASS') {
+        handleSkip();
+        return;
+    }
     let elem = letterElements[currentLetterIndex];
     elem.classList.remove('active')
     correctAnswer = currentQuestion.correctAnswer;
@@ -117,11 +118,13 @@ function handleSubmit() {
     else{
         elem.classList.add('incorrect');
     }
+    if (skipMode) {
+        skippedLetters.shift(); // why is javascript like this
+    }
     answerInput.value = '';
     currentLetterIndex++;
     setNextQuestion();
 }
-    
     
 function handleSkip() {
     if (skipsRemaining <=0 || !gameActive || skippedLetters.includes(currentLetterIndex)){
