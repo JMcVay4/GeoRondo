@@ -110,14 +110,14 @@ function handleSubmit() {
     }
     let elem = letterElements[currentLetterIndex];
     elem.classList.remove('active')
-    correctAnswer = currentQuestion.correctAnswer;
-    if (answer.toUpperCase() === correctAnswer.toUpperCase()) {
-        elem.classList.add('completed');
-        elem.style.fontWeight = 'normal';
-    }
-    else{
-        elem.classList.add('incorrect');
-    }
+    correctAnswers = currentQuestion.correctAnswers;
+    elem.classList.add('incorrect');
+    correctAnswers.forEach(correctAnswer => {
+        if (answer.toUpperCase() === correctAnswer.toUpperCase()) {
+            elem.classList.remove('incorrect');
+            elem.classList.add('completed');
+        }
+    });
     if (skipMode) {
         skippedLetters.shift(); // why is javascript like this
     }
