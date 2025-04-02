@@ -147,7 +147,8 @@ function handleSkip() {
 function endGame() {
     gameActive = false;
     clearInterval(timerInterval);
-    questionElement.textContent = 'Game Over! Time = ' + totalTime.toFixed(1);
+    let finalTime = timeLimit - totalTime;
+    questionElement.textContent = 'Game Over! Time = ' + finalTime.toFixed(1);
     answerInput.disabled = true;
     startButton.style.display = 'inline-block';
     startButton.textContent = 'Play Again';
@@ -155,7 +156,7 @@ function endGame() {
     completedCount = document.querySelectorAll('.letter.completed').length;
     playerName = prompt("Enter your name for the leaderboard:", "Player");
     if (playerName){
-        addToLeaderboard(playerName, timeLimit - totalTime, completedCount);
+        addToLeaderboard(playerName, finalTime, completedCount);
     }
     document.querySelector('.leaderboard').style.display = 'block';
 }

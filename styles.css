@@ -18,13 +18,24 @@ body{
 }   
 h1{
     color:rgb(127, 136, 138);
-    margin-bottom: 5px;
+    margin-bottom: 10px;
+    padding-top: 130px;
+}
+h2{
+    color:rgb(127, 136, 138);
+    margin-bottom: 25px;
+    margin-top: 30px;
 }
 .letter-circles{
     display: flex;
-    justify-content:center;
+    justify-content: center;
     flex-wrap: wrap;
+    margin: auto;
     margin-bottom: 20px;
+    margin-top: 20px;
+    vertical-align: middle;
+    height: 50px;
+    width: 90%;
 }
 .letter{
     width: 40px;
@@ -52,8 +63,7 @@ h1{
     color: white;
 }
 .active{
-    background-color: purple;
-    color: white;
+    border: deepskyblue solid 4px;
 }
 .question-container{
     margin: 30px;
@@ -70,15 +80,15 @@ h1{
     padding: 10px;
     font-size: 16px;
     width: 300px;
-    margin: 0;
-    text-align:center;
+    margin: auto;
+    text-align: center;
 }
 .button-container{
     margin: 20px;
 }
 button{
     padding: 10px;
-    margin: px;
+    margin: 10px;
     border: none;
     border-radius: 5px;
     font-size: 16px;
