@@ -51,6 +51,10 @@ h1{
     background-color:red;
     color: white;
 }
+.active{
+    background-color: purple;
+    color: white;
+}
 .question-container{
     margin: 30px;
     display: flex;
