@@ -28,7 +28,7 @@ function createLetterCircles(){
     const containerHeight = letterCirclesContainer.offsetHeight;
     const centerX = containerWidth / 2;
     const centerY = containerHeight / 2;
-    const radius = containerWidth * 0.25; // about 40% of the width outward
+    const radius = containerWidth * 0.25; 
     const totalLetters = alphabet.length;
 
     alphabet.forEach((letter, index) => {

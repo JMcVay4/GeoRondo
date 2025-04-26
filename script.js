@@ -16,5 +16,4 @@ function initializeGame() {
         }
     });
 }
-
 window.onload = initializeGame;

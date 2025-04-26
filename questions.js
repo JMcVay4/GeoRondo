@@ -178,4 +178,4 @@ function initializeQuestions() {
             { "question": "Dutch province whose \"New\" version is more famous", "correctAnswers": ["Zeeland", "Zealand"] },
         ]
     };
-}
+    }

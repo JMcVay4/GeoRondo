@@ -56,7 +56,7 @@ h2{
     font-size: 18px;
     font-weight: bold;
     color:black;
-    transform-origin: center center;
+    transform-origin: center center; 
 }
 .completed{
     background-color: green;
