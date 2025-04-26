@@ -16,10 +16,10 @@ Simply open index.html in a browser of your choice.
 KNOWN BUGS
 
 - Names do not display on the leaderboard
-- Play again button does not work
+
 
 FUTURE IDEAS
-
+- Leaderboard should only display top 10 scores by different users(An individual cannot have more than 1 entry)
 - Add more questions
 - Button to clear leaderboard
 - Multiplayer mode/leaderboard

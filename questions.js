@@ -57,7 +57,7 @@ function initializeQuestions() {
             { "question": "Country where Tegucigalpa is located in", "correctAnswers": ["Honduras"] },
             { "question": "Japan's north island", "correctAnswers": ["Hokkaido"] },
             { "question": "Seaside capital of Nova Scotia", "correctAnswers": ["Halifax"] },
-            { "question": "Central European country home to the largest synagogue in Europe", "correctAnswers": ["Oman"] },
+            { "question": "Central European country home to the largest synagogue in Europe", "correctAnswers": ["Hungary"] },
         ],
         'I': [
             { "question": "Spanish Island known for its nightlife and EDM", "correctAnswers": ["Ibiza"] },

@@ -18,17 +18,35 @@ let totalTime = 0;
 let timerInterval;
 let skipsRemaining = 3
 let questionsDatabase = {};
+let savedSkippedQuestions = [];
 let currentQuestion = '';
 let skipMode = false; // true if the user is now answering skipped questions
 
 // keep track of letter divs in array for easy update
 function createLetterCircles(){
-    alphabet.forEach(letter => {
+    const containerWidth = letterCirclesContainer.offsetWidth;
+    const containerHeight = letterCirclesContainer.offsetHeight;
+    const centerX = containerWidth / 2;
+    const centerY = containerHeight / 2;
+    const radius = containerWidth * 0.25; // about 40% of the width outward
+    const totalLetters = alphabet.length;
+
+    alphabet.forEach((letter, index) => {
         const letterDiv = document.createElement('div');
         letterDiv.className = 'letter';
         letterDiv.textContent = letter;
+
+        const angleDeg = (360 / totalLetters) * index;
+        const angleRad = angleDeg * (Math.PI / 180);
+
+        const x = centerX + radius * Math.cos(angleRad) - 20;
+        const y = centerY + radius * Math.sin(angleRad) - 20;
+
+        letterDiv.style.left = `${x}px`;
+        letterDiv.style.top = `${y}px`;
+
         letterCirclesContainer.appendChild(letterDiv);
-        letterElements.push(letterDiv)
+        letterElements.push(letterDiv);
     });
 }
 
@@ -39,16 +57,22 @@ function getRandomQuestion(letter){
 }
 
 function startGame() {
-    gameActive = true;
     currentLetterIndex = 0;
     skipsRemaining = 3;
+    clearInterval(timerInterval);
+    totalTime = timeLimit;
+    gameActive = true;
+    skipMode = false;
+    answerInput.disabled = false;
     startButton.style.display = 'none';
     skipButton.style.display = 'inline-block';
+    skipButton.disabled = false;
     skipsElement.textContent = 'Skips: ' + skipsRemaining + ' remaining';
-    // answerInput.disabled = false;
-    // answerInput.focus();
+    letterElements.forEach(letter => {
+        letter.classList.remove('completed', 'skipped', 'incorrect', 'active');
+        letter.style.fontWeight = 'bold';
+    });
     startTime = Date.now();
-    totalTime = timeLimit;
     timerInterval = setInterval(updateTimer, 1000);
     setNextQuestion();
 }
@@ -69,24 +93,21 @@ function updateTimer() {
 function setNextQuestion() {
     // handle skipped letters first (or possible game end)
     if (currentLetterIndex >= alphabet.length || skipMode) {
-        if (skippedLetters.length === 0){
+        skipMode = true;
+        if (skippedLetters.length === 0) {
             endGame();
             return;
         }
-        else {
-            skipMode = true;
-            currentLetterIndex = skippedLetters[0];
-            letterElements[currentLetterIndex].classList.remove('skipped');
-            letterElements[currentLetterIndex].classList.add('active');
-            const currentLetter = alphabet[currentLetterIndex];
-            const savedQuestion = questionsDatabase[currentLetter][0]
-            questionElement.textContent = savedQuestion.question;
-            currentQuestion = savedQuestion;
-            answerInput.value = '';
-            answerInput.focus();
-        }
-    }    
-    // handle normal game progression
+        currentLetterIndex = skippedLetters[0];
+        letterElements[currentLetterIndex].classList.remove('skipped');
+        letterElements[currentLetterIndex].classList.add('active');
+        currentQuestion = savedSkippedQuestions[0];
+        questionElement.textContent = currentQuestion.question;
+        answerInput.value = '';
+        answerInput.focus();
+        return;
+    }
+    
     const currentLetter = alphabet[currentLetterIndex];
     const randomQuestion = getRandomQuestion(currentLetter);
     letterElements[currentLetterIndex].classList.add('active');
@@ -100,11 +121,11 @@ function handleSubmit() {
     if (!gameActive){
         return;
     }
-    answer = answerInput.value.trim();
+    let answer = answerInput.value.trim();
     if (!answer) {
         return;
     }
-    if (answer.toUpperCase() === 'PASS') {
+    if (answer.toUpperCase() === 'SKIP') {
         handleSkip();
         return;
     }
@@ -120,9 +141,10 @@ function handleSubmit() {
     });
     if (skipMode) {
         skippedLetters.shift(); // why is javascript like this
+        savedSkippedQuestions.shift();
     }
-    answerInput.value = '';
     currentLetterIndex++;
+    answerInput.value = '';
     setNextQuestion();
 }
     
@@ -136,7 +158,10 @@ function handleSkip() {
     letterElements[currentLetterIndex].classList.remove('active');
     letterElements[currentLetterIndex].classList.add('skipped');
     letterElements[currentLetterIndex].style.fontWeight = 'normal';
-    skippedLetters.push(currentLetterIndex);
+    savedSkippedQuestions.push(currentQuestion);
+    skippedLetters.push(currentLetterIndex)
+    
+       
     currentLetterIndex++;
     setNextQuestion();
     if (skipsRemaining ===0){
@@ -188,7 +213,7 @@ function updateLeaderboardDisplay(leaderboard){
         rankCell = row.insertCell();
         rankCell.textContent = index + 1;
         nameCell = row.insertCell();
-        nameCell.textcontent = entry.name;
+        nameCell.textContent = entry.name;
         timeCell = row.insertCell();
         timeCell.textContent = entry.time.toFixed(1);
         lettersCell = row.insertCell();
