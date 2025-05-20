@@ -19,8 +19,7 @@ KNOWN BUGS
 
 
 FUTURE IDEAS
-- Leaderboard should only display top 10 scores by different users(An individual cannot have more than 1 entry)
 - Add more questions
 - Button to clear leaderboard
 - Multiplayer mode/leaderboard
-- Difficulties??
+- Once a whole circle is completed it gets harder

@@ -5,7 +5,9 @@ const startButton = document.getElementById('start-button');
 const skipButton = document.getElementById('skip-button');
 const timerElement = document.querySelector('.timer');
 const skipsElement = document.querySelector('.skips');
+const difficultySelect = document.getElementById('difficulty')
 const leaderboardTable = document.getElementById('leaderboard-table');
+
 
 let timeLimit = 150;
 let alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
@@ -20,7 +22,15 @@ let skipsRemaining = 3
 let questionsDatabase = {};
 let savedSkippedQuestions = [];
 let currentQuestion = '';
+let selectedDifficulty = 'easy';
 let skipMode = false; // true if the user is now answering skipped questions
+
+difficultySelect.addEventListener('change', function () {
+        selectedDifficulty = difficultySelect.value;
+        const key = "geoLeaderboard_" + selectedDifficulty;
+        const leaderboard = JSON.parse(localStorage.getItem(key)) || [];
+        updateLeaderboardDisplay(leaderboard);
+    });
 
 // keep track of letter divs in array for easy update
 function createLetterCircles(){
@@ -52,13 +62,18 @@ function createLetterCircles(){
 
 function getRandomQuestion(letter){
     const questions = questionsDatabase[letter];
-    const randomIndex = Math.floor(Math.random() * questions.length);
-    return questions[randomIndex];
+    const questionDifficulty = questions.filter(question => {
+        return question.difficulty === selectedDifficulty;
+    })
+    const randomIndex = Math.floor(Math.random() * questionDifficulty.length);
+    return questionDifficulty[randomIndex];
 }
 
 function startGame() {
     currentLetterIndex = 0;
     skipsRemaining = 3;
+    skippedLetters = [];
+    savedSkippedQuestions = [];
     clearInterval(timerInterval);
     totalTime = timeLimit;
     gameActive = true;
@@ -67,6 +82,7 @@ function startGame() {
     startButton.style.display = 'none';
     skipButton.style.display = 'inline-block';
     skipButton.disabled = false;
+    difficultySelect.disabled = true;
     skipsElement.textContent = 'Skips: ' + skipsRemaining + ' remaining';
     letterElements.forEach(letter => {
         letter.classList.remove('completed', 'skipped', 'incorrect', 'active');
@@ -177,7 +193,8 @@ function endGame() {
     answerInput.disabled = true;
     startButton.style.display = 'inline-block';
     startButton.textContent = 'Play Again';
-    skipButton.style.display = 'none';
+    skipButton.style.display = 'none'; 
+    difficultySelect.disabled = false;
     completedCount = document.querySelectorAll('.letter.completed').length;
     playerName = prompt("Enter your name for the leaderboard:", "Player");
     if (playerName){
@@ -189,10 +206,14 @@ function endGame() {
 // leaderboard functions
 function addToLeaderboard(name, time, lettersCompleted){
     entry = {name, time, lettersCompleted};
+    let key = "geoLeaderboard_" + selectedDifficulty;
     let leaderboard = [];
-    if(localStorage.getItem('geoLeaderboard')) {
-        leaderboard = JSON.parse(localStorage.getItem('geoLeaderboard'));
+    if(localStorage.getItem(key)) {
+        leaderboard = JSON.parse(localStorage.getItem(key));
     }
+    leaderboard = leaderboard.filter(e => e.name !== name || 
+        (e.lettersCompleted > lettersCompleted || 
+        (e.lettersCompleted === lettersCompleted && e.time <= time)));
     leaderboard.push(entry);
     leaderboard.sort((a,b) => {
         if (b.lettersCompleted !== a.lettersCompleted) {
@@ -200,8 +221,16 @@ function addToLeaderboard(name, time, lettersCompleted){
         }
         return a.time - b.time;
     });
+    const uniqueName = {};
+    leaderboard = leaderboard.filter(entry => {
+        if (!uniqueName[entry.name]) {
+            uniqueName[entry.name] = true;
+            return true;
+        }
+        return false;
+    })
     leaderboard = leaderboard.slice(0,10);
-    localStorage.setItem('geoLeaderboard', JSON.stringify(leaderboard));
+    localStorage.setItem(key, JSON.stringify(leaderboard));
     updateLeaderboardDisplay(leaderboard);
 }   
 function updateLeaderboardDisplay(leaderboard){

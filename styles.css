@@ -74,15 +74,18 @@ h2{
     border: deepskyblue solid 4px;
 }
 .question-container{
-    margin: 30px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
+    margin-bottom: 20px;
+    text-align: center;
 }
 .question{
     font-size: 20px;
     margin-bottom: 20px;
-    color:white
+    color:white;
+    text-align: center;
+    word-wrap: break-word;
+    max-width: 480px;
+    margin-left: auto;
+    margin-right: auto;
 }
 #answer-input{
     padding: 10px;
@@ -126,6 +129,11 @@ button:hover{
 .game-over{
     font-size: 24px;
     color: #2c3e50
+}
+.leaderboard {
+    display: none; 
+    margin-top: 20px;
+    text-align: center;
 }
 table{
     width: 100%;

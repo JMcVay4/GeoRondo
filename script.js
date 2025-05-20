@@ -2,9 +2,10 @@ function initializeGame() {
     createLetterCircles();
     initializeQuestions();
     // leaderboard setup, not rly used rn
+    let key = "geoLeaderboard_" + selectedDifficulty;
     let leaderboard = [];
-    if(localStorage.getItem('geoLeaderboard')){
-        leaderboard = JSON.parse(localStorage.getItem('geoLeaderboard'));
+    if(localStorage.getItem(key)){
+        leaderboard = JSON.parse(localStorage.getItem(key));
         updateLeaderboardDisplay(leaderboard);
     }
     // event handlers
