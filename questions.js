@@ -62,7 +62,7 @@ function initializeQuestions() {
             { "question": "Country with the driest non-polar desert in the world ", "correctAnswers": ["Chile"], "difficulty": "medium" },
             { "question": "Country with the largest population of pink dolphins", "correctAnswers": ["Colombia"], "difficulty": "grandmaster" },
             { "question": "Capital of Egypt", "correctAnswers": ["Cairo"], "difficulty": "medium" },
-            { "question": "Asian Country with the second largest population", "correctAnswers": ["China"], "difficulty": "easy" },
+            { "question": "Asian Country with the second largest population in the world", "correctAnswers": ["China"], "difficulty": "easy" },
             { "question": "Latin American country with no standing army", "correctAnswers": ["Costa Rica", "Curacao"], "difficulty": "hard" },
             { "question": "US City with the nickname \”Windy City\”" , "correctAnswers": ["Chicago"], "difficulty": "medium" },
             { "question": "Landlocked country in Africa", "correctAnswers": ["Chad"], "difficulty": "medium" },

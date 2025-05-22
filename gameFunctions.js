@@ -7,7 +7,8 @@ const timerElement = document.querySelector('.timer');
 const skipsElement = document.querySelector('.skips');
 const difficultySelect = document.getElementById('difficulty')
 const leaderboardTable = document.getElementById('leaderboard-table');
-
+const summaryDiv = document.getElementById('summary-container');
+const table = document.getElementById('summary-table');
 
 let timeLimit = 150;
 let alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
@@ -23,6 +24,7 @@ let questionsDatabase = {};
 let savedSkippedQuestions = [];
 let currentQuestion = '';
 let selectedDifficulty = 'easy';
+let playerAnswers = [];  // stores the following: {letter, question, correctAnswer, wasCorrect}
 let skipMode = false; // true if the user is now answering skipped questions
 
 difficultySelect.addEventListener('change', function () {
@@ -70,10 +72,13 @@ function getRandomQuestion(letter){
 }
 
 function startGame() {
+    document.querySelector('.leaderboard').style.display = 'none';
+    summaryDiv.classList.add('hidden');
     currentLetterIndex = 0;
     skipsRemaining = 3;
     skippedLetters = [];
     savedSkippedQuestions = [];
+    playerAnswers = [];
     clearInterval(timerInterval);
     totalTime = timeLimit;
     gameActive = true;
@@ -145,16 +150,26 @@ function handleSubmit() {
         handleSkip();
         return;
     }
-    let elem = letterElements[currentLetterIndex];
-    elem.classList.remove('active')
-    correctAnswers = currentQuestion.correctAnswers;
-    elem.classList.add('incorrect');
+    let letter = letterElements[currentLetterIndex];
+    let wasCorrect = false;
+    let correctAnswers = currentQuestion.correctAnswers;
+    playerAnswers.push({
+        letter: alphabet[currentLetterIndex],
+        question: currentQuestion.question,
+        userAnswer: answer,
+        wasCorrect: wasCorrect,
+        correctAnswers: correctAnswers
+    })
+    letter.classList.remove('active')
+    letter.classList.add('incorrect');
     correctAnswers.forEach(correctAnswer => {
         if (answer.toUpperCase() === correctAnswer.toUpperCase()) {
-            elem.classList.remove('incorrect');
-            elem.classList.add('completed');
+            letter.classList.remove('incorrect');
+            letter.classList.add('completed');
+            wasCorrect = true;
         }
     });
+    playerAnswers[playerAnswers.length - 1].wasCorrect = wasCorrect;
     if (skipMode) {
         skippedLetters.shift(); // why is javascript like this
         savedSkippedQuestions.shift();
@@ -174,6 +189,13 @@ function handleSkip() {
     letterElements[currentLetterIndex].classList.remove('active');
     letterElements[currentLetterIndex].classList.add('skipped');
     letterElements[currentLetterIndex].style.fontWeight = 'normal';
+    playerAnswers.push({
+        letter: alphabet[currentLetterIndex],
+        question: currentQuestion.question,
+        userAnswer: '',
+        wasCorrect: false,
+        correctAnswers: currentQuestion.correctAnswers
+    });
     savedSkippedQuestions.push(currentQuestion);
     skippedLetters.push(currentLetterIndex)
     
@@ -201,9 +223,48 @@ function endGame() {
         addToLeaderboard(playerName, finalTime, completedCount);
     }
     document.querySelector('.leaderboard').style.display = 'block';
+    document.getElementById("summary-container").classList.remove("hidden");
+    document.getElementById("summary-container").style.display = 'block';
+    showSummary(playerName, finalTime, completedCount);
 }
 
-// leaderboard functions
+function showSummary(playerName, finalTime, completedCount){
+    while (table.rows.length > 1){
+        table.deleteRow(1);
+    }
+    for (let i = 0; i < playerAnswers.length; i++) {
+        let row = table.insertRow();
+        let letterCell = row.insertCell();
+        letterCell.textContent = playerAnswers[i].letter;
+        let questionCell = row.insertCell();
+        questionCell.textContent = playerAnswers[i].question;
+        let userAnswerCell = row.insertCell();
+        if (playerAnswers[i].userAnswer === "") {
+            userAnswerCell.textContent = "Skipped";
+        } 
+        else {
+            userAnswerCell.textContent = playerAnswers[i].userAnswer;
+}
+        let statusCell = row.insertCell();
+        if(playerAnswers[i].wasCorrect === true){
+            statusCell.textContent = "correct";
+        }
+        else{
+            if (playerAnswers[i].userAnswer === "" ){
+                statusCell.textContent = "Skipped";
+            }
+            else{
+                statusCell.textContent = "Incorrect"
+            }
+            }
+        let correctAnswersCell = row.insertCell();
+        correctAnswersCell.textContent = playerAnswers[i].correctAnswers.join(", ");
+        }
+    summaryDiv.classList.remove("hidden");
+    }
+
+
+
 function addToLeaderboard(name, time, lettersCompleted){
     entry = {name, time, lettersCompleted};
     let key = "geoLeaderboard_" + selectedDifficulty;
