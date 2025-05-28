@@ -20,6 +20,5 @@ KNOWN BUGS
 
 FUTURE IDEAS
 - Add more questions
-- Button to clear leaderboard
 - Multiplayer mode/leaderboard
 - Once a whole circle is completed it gets harder

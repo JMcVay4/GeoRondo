@@ -1,14 +1,15 @@
-const letterCirclesContainer = document.querySelector('.letter-circles');
+const letterCirclesContainer = document.getElementById('letter-circles');
 const questionElement = document.querySelector('.question');
 const answerInput = document.getElementById('answer-input')
 const startButton = document.getElementById('start-button');
 const skipButton = document.getElementById('skip-button');
+const dailyButton = document.getElementById('daily-button');
 const timerElement = document.querySelector('.timer');
 const skipsElement = document.querySelector('.skips');
-const difficultySelect = document.getElementById('difficulty')
-const leaderboardTable = document.getElementById('leaderboard-table');
 const summaryDiv = document.getElementById('summary-container');
 const table = document.getElementById('summary-table');
+const difficultyRadios = document.querySelectorAll('input[name="difficulty"]');
+
 
 let timeLimit = 150;
 let alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
@@ -20,21 +21,48 @@ let startTime = 0;
 let totalTime = 0;
 let timerInterval;
 let skipsRemaining = 3
+let selectedDifficulty = 'easy'; 
 let questionsDatabase = {};
 let savedSkippedQuestions = [];
 let currentQuestion = '';
-let selectedDifficulty = 'easy';
 let playerAnswers = [];  // stores the following: {letter, question, correctAnswer, wasCorrect}
 let skipMode = false; // true if the user is now answering skipped questions
+let dailyMode = false;
+let dailyQuestions = [];
+let cameFromGame = false;
 
-difficultySelect.addEventListener('change', function () {
-        selectedDifficulty = difficultySelect.value;
+difficultyRadios.forEach(radio => {
+    radio.addEventListener('change', () => {
+        selectedDifficulty = document.querySelector('input[name="difficulty"]:checked').value;
         const key = "geoLeaderboard_" + selectedDifficulty;
         const leaderboard = JSON.parse(localStorage.getItem(key)) || [];
-        updateLeaderboardDisplay(leaderboard);
+        updateLeaderboardDisplay("leaderboard-" + selectedDifficulty, leaderboard);;
     });
+});
+document.getElementById("show-leaderboard").addEventListener("click", () => {
+  cameFromGame = !document.getElementById("start-screen").classList.contains("hidden");
+  document.getElementById("start-screen").classList.add("hidden");
+  document.getElementById("game-ui").classList.add("hidden");
+  document.getElementById("summary-container").classList.add("hidden");
+  const leaderboardSection = document.getElementById("leaderboard-section");
+  leaderboardSection.style.display = "flex";
+  document.getElementById("letter-circles").style.display = "none";
+  if (!cameFromGame && document.getElementById("summary-container").classList.contains("hidden") === false) {
+    document.getElementById("summary-container").classList.add("hidden");
+  }
+  loadAllLeaderboards();
+});
+document.getElementById("back-to-menu").addEventListener("click", () => {
+  document.getElementById("leaderboard-section").style.display = "none";
+  document.getElementById("letter-circles").style.display = "block";
+  if (cameFromGame) {
+    document.getElementById("game-ui").classList.remove("hidden");
+  } 
+  else {
+    document.getElementById("start-screen").classList.remove("hidden");
+  }
+});
 
-// keep track of letter divs in array for easy update
 function createLetterCircles(){
     const containerWidth = letterCirclesContainer.offsetWidth;
     const containerHeight = letterCirclesContainer.offsetHeight;
@@ -72,7 +100,10 @@ function getRandomQuestion(letter){
 }
 
 function startGame() {
-    document.querySelector('.leaderboard').style.display = 'none';
+    selectedDifficulty = document.querySelector('input[name="difficulty"]:checked').value;
+    document.getElementById("start-screen").classList.add("hidden");
+    document.getElementById('game-ui').classList.remove('hidden');
+    document.getElementById('main-menu-container').style.display = 'none';
     summaryDiv.classList.add('hidden');
     currentLetterIndex = 0;
     skipsRemaining = 3;
@@ -87,7 +118,6 @@ function startGame() {
     startButton.style.display = 'none';
     skipButton.style.display = 'inline-block';
     skipButton.disabled = false;
-    difficultySelect.disabled = true;
     skipsElement.textContent = 'Skips: ' + skipsRemaining + ' remaining';
     letterElements.forEach(letter => {
         letter.classList.remove('completed', 'skipped', 'incorrect', 'active');
@@ -104,8 +134,8 @@ function updateTimer() {
         clearInterval(timerInterval);
         endGame();
     }
-    seconds = totalTime % 60;
-    minutes = Math.floor(totalTime/60);
+    let seconds = totalTime % 60;
+    let minutes = Math.floor(totalTime/60);
     let formattedSeconds;
     formattedSeconds = seconds < 10 ? "0" + seconds : seconds;
     timerElement.textContent = 'Time: ' + minutes + ':' + formattedSeconds;
@@ -128,9 +158,13 @@ function setNextQuestion() {
         answerInput.focus();
         return;
     }
-    
     const currentLetter = alphabet[currentLetterIndex];
-    const randomQuestion = getRandomQuestion(currentLetter);
+    let randomQuestion;
+    if (dailyMode === true) {
+        randomQuestion = dailyQuestions[currentLetterIndex];
+  } else {
+        randomQuestion = getRandomQuestion(currentLetter);
+  }
     letterElements[currentLetterIndex].classList.add('active');
     questionElement.textContent = randomQuestion.question;
     currentQuestion = randomQuestion;
@@ -198,7 +232,6 @@ function handleSkip() {
     });
     savedSkippedQuestions.push(currentQuestion);
     skippedLetters.push(currentLetterIndex)
-    
        
     currentLetterIndex++;
     setNextQuestion();
@@ -216,16 +249,16 @@ function endGame() {
     startButton.style.display = 'inline-block';
     startButton.textContent = 'Play Again';
     skipButton.style.display = 'none'; 
-    difficultySelect.disabled = false;
-    completedCount = document.querySelectorAll('.letter.completed').length;
-    playerName = prompt("Enter your name for the leaderboard:", "Player");
+    let completedCount = document.querySelectorAll('.letter.completed').length;
+    let playerName = prompt("Enter your name for the leaderboard:", "Player");
     if (playerName){
         addToLeaderboard(playerName, finalTime, completedCount);
     }
-    document.querySelector('.leaderboard').style.display = 'block';
     document.getElementById("summary-container").classList.remove("hidden");
     document.getElementById("summary-container").style.display = 'block';
     showSummary(playerName, finalTime, completedCount);
+    document.getElementById("start-screen").classList.remove("hidden");
+    document.getElementById("game-ui").classList.add("hidden");
 }
 
 function showSummary(playerName, finalTime, completedCount){
@@ -264,14 +297,10 @@ function showSummary(playerName, finalTime, completedCount){
     }
 
 
-
 function addToLeaderboard(name, time, lettersCompleted){
-    entry = {name, time, lettersCompleted};
-    let key = "geoLeaderboard_" + selectedDifficulty;
-    let leaderboard = [];
-    if(localStorage.getItem(key)) {
-        leaderboard = JSON.parse(localStorage.getItem(key));
-    }
+    const key = getLeaderboardKey();
+    let leaderboard = JSON.parse(localStorage.getItem(key)) || [];
+    let entry = {name, time, lettersCompleted};
     leaderboard = leaderboard.filter(e => e.name !== name || 
         (e.lettersCompleted > lettersCompleted || 
         (e.lettersCompleted === lettersCompleted && e.time <= time)));
@@ -292,21 +321,75 @@ function addToLeaderboard(name, time, lettersCompleted){
     })
     leaderboard = leaderboard.slice(0,10);
     localStorage.setItem(key, JSON.stringify(leaderboard));
-    updateLeaderboardDisplay(leaderboard);
+    let suffix;
+    if (dailyMode === true) {
+        suffix = "daily";
+    } 
+    else {
+        suffix = selectedDifficulty;
+}
+    updateLeaderboardDisplay("leaderboard-" + suffix, leaderboard);
 }   
-function updateLeaderboardDisplay(leaderboard){
+
+function loadAllLeaderboards() {
+  const difficulties = ["easy", "medium", "hard", "grandmaster"];
+  difficulties.forEach(diff => {
+    const key = "geoLeaderboard_" + diff;
+    const data = JSON.parse(localStorage.getItem(key)) || [];
+    updateLeaderboardDisplay("leaderboard-" + diff, data);
+  });
+  const todayKey = "geoDaily_" + new Date().toISOString().slice(0, 10);
+  const dailyData = JSON.parse(localStorage.getItem(todayKey)) || [];
+  updateLeaderboardDisplay("leaderboard-daily", dailyData);
+}
+
+function updateLeaderboardDisplay(tableId, data){
+    const leaderboardTable = document.getElementById(tableId);
     while(leaderboardTable.rows.length >1){
         leaderboardTable.deleteRow(1);
     }
-    leaderboard.forEach((entry, index)=> {
-        row = leaderboardTable.insertRow();
-        rankCell = row.insertCell();
+    data.forEach((entry, index)=> {
+        let row = leaderboardTable.insertRow();
+        let rankCell = row.insertCell();
         rankCell.textContent = index + 1;
-        nameCell = row.insertCell();
+        let nameCell = row.insertCell();
         nameCell.textContent = entry.name;
-        timeCell = row.insertCell();
+        let timeCell = row.insertCell();
         timeCell.textContent = entry.time.toFixed(1);
-        lettersCell = row.insertCell();
+        let lettersCell = row.insertCell();
         lettersCell.textContent = entry.lettersCompleted;
     });
 }
+function getTodayIndex() {
+  const today = new Date();
+  const start = new Date("2025-01-01"); 
+  const diffDays = Math.floor((today - start) / (1000 * 60 * 60 * 24));
+  return diffDays;
+}
+function getDailyQuestionSet() {
+  const index = getTodayIndex();
+  const result = [];
+
+  for (let i = 0; i < alphabet.length; i++) {
+    const letter = alphabet[i];
+    const pool = questionsDatabase[letter] || [];
+
+    const question = pool[index % pool.length]; // wraps around if index past # questions
+    result.push(question);
+  }
+  return result;
+}
+function startDailyChallenge() {
+  dailyMode = true;
+  dailyQuestions = getDailyQuestionSet();
+  startGame();
+}
+function getLeaderboardKey() {
+  if (dailyMode === true) {
+    const date = new Date().toISOString().slice(0, 10);
+    return "geoDaily_" + date;
+  } else {
+    return "geoLeaderboard_" + selectedDifficulty;
+  }
+}
+

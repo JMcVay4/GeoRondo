@@ -6,63 +6,146 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="game-container">
-        <h1>GeoRondo</h1>
-        <div class="letter-circles">
-            <div class="center-content">
-                <div class="stats">
-                    <div class="timer">Time: 2:30</div>
-                    <div class="skips">Skips: 3 remaining</div>
+    <video src="starbackground.mp4" muted loop autoplay playsinline id="background-video"></video>
+    <div id="blue-tint"></div>
+    <div class="letter-circles" id="letter-circles"></div>
+    <header class="top-nav">
+        <div class="logo">GeoRondo</div>
+        <div class="nav-buttons">
+            <button id="how-to-play">How to Play</button>
+            <button id="login-button">Login</button>
+        </div>
+    </header>
+    <div id="start-screen">
+        <div class="dashboard-container">
+            <div id="summary-container" class="hidden">
+                <h2>Game Summary</h2>
+                <table id="summary-table">
+                    <tr>
+                        <th>Letter</th>
+                        <th>Question</th>
+                        <th>Your Answer</th>
+                        <th>Status</th>
+                        <th>Correct Answer</th>
+                    </tr>
+                </table>
+            </div>
+            <div class="sidebar left">
+                <div class="card">
+                    <h2>🌍 Daily Challenge</h2>
+                    <p>Same challenge for everyone!</p>
+                    <button id="daily-button">Play</button>
                 </div>
-            
-                <div class="question-container">
-                    <div class ="question">...</div>
-                    <input type="text" id="answer-input" placeholder="Type your answer here">
-                </div>
+            </div>
+            <div id="main-menu-container" class="main-menu">
+                <h1 class="title">GeoRondo</h1>
+                <p class="subtitle">Choose your difficulty and begin your round:</p>
+                <div class="toggle-difficulty">
+                    <input type="radio" id="easy" name="difficulty" value="easy" checked>
+                    <label for="easy">Easy</label>
 
-                <div class="button-container">
-                    <button id="start-button">Start Game</button>
-                    <button id="skip-button">Skip(3 left)</button>
-                </div>
+                    <input type="radio" id="medium" name="difficulty" value="medium">
+                    <label for="medium">Medium</label>
 
-                <div class="difficult-container">
-                    <div class = "difficulty-text">Difficulty</div>
-                    <select id = "difficulty">
-                        <option value= "easy">Easy</option>
-                        <option value= "medium">Medium</option>
-                        <option value= "hard">Hard</option>
-                        <option value= "grandmaster">Grandmaster</option>
-                    </select>
+                    <input type="radio" id="hard" name="difficulty" value="hard">
+                    <label for="hard">Hard</label>
+
+                    <input type="radio" id="grandmaster" name="difficulty" value="grandmaster">
+                    <label for="grandmaster">Grandmaster</label>
+                    </div>
+                <button id="start-button" class="big-play-button">Start Game</button>
+            </div>
+            <div class="sidebar right">
+                <div class="card">
+                    <h2>Leaderboard</h2>
+                    <p>See today's top GeoRondo players</p>
+                    <button id="show-leaderboard">View</button>
                 </div>
             </div>
         </div>
-        <div class="leaderboard">
-            <h2>Leaderboard</h2>
-            <table id="leaderboard-table">
-                <tr>
-                    <th>Rank</th>
-                    <th>Player</th>
-                    <th>Time</th>
-                    <th>Score</th>
-                </tr>
-            </table>
+    </div>
+    <div id="game-ui" class="hidden">
+        <div class="game-container">
+            <div class="center-content">
+                    <div class="stats">
+                        <div class="timer">Time: 2:30</div>
+                        <div class="skips">Skips: 3 remaining</div>
+                    </div>
+                    <div class="question-container">
+                        <div class ="question">...</div>
+                        <input type="text" id="answer-input" placeholder="Type your answer here">
+                    </div>
+                    <div class="button-container">
+                        <button id="skip-button">Skip(3 left)</button>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div id="summary-container" class="summary hidden">
-            <h2>Game Summary</h2>
-            <table id="summary-table">
-                <tr>
-                    <th>Letter</th>
-                    <th>Question</th>
-                    <th>Your Answer</th>
-                    <th>Status</th>
-                    <th>Correct Answer</th>
-                </tr>
-            </table>
+    <div id="leaderboard-section">
+        <h2 class="leaderboard-heading">Leaderboard</h2>
+        <button id="back-to-menu" class="big-play-button">Back</button>
+        <div id="leaderboard-container">
+            <div class="difficulty-board">
+                <h3>Daily Challenge</h3>
+                <table class="leaderboard-table" id="leaderboard-daily">
+                    <tr>
+                        <th>Rank</th>
+                        <th>Player</th>
+                        <th>Time</th>
+                        <th>Score</th>
+                    </tr>
+                </table>
+            </div>
+            <div class="difficulty-board">
+                <h3>Easy</h3>
+                <table class="leaderboard-table" id="leaderboard-easy">
+                    <tr>
+                        <th>Rank</th>
+                        <th>Player</th>
+                        <th>Time</th>
+                        <th>Score</th>
+                    </tr>
+                </table>
+            </div>
+            <div class="difficulty-board">
+                <h3>Medium</h3>
+                <table class="leaderboard-table" id="leaderboard-medium">
+                    <tr>
+                        <th>Rank</th>
+                        <th>Player</th>
+                        <th>Time</th>
+                        <th>Score</th>
+                    </tr>
+                </table>
+            </div>
+            <div class="difficulty-board">
+                <h3>Hard</h3>
+                <table class="leaderboard-table" id="leaderboard-hard">
+                    <tr>
+                        <th>Rank</th>
+                        <th>Player</th>
+                        <th>Time</th>
+                        <th>Score</th>
+                    </tr>
+                </table>
+            </div>
+            <div class="difficulty-board">
+                <h3>Grandmaster</h3>
+                <table class="leaderboard-table" id="leaderboard-grandmaster">
+                    <tr>
+                        <th>Rank</th>
+                        <th>Player</th>
+                        <th>Time</th>
+                        <th>Score</th>
+                    </tr>
+                </table>
+            </div>
         </div>
-     </div>
-    <script src="questions.js"></script>
-    <script src="gameFunctions.js"></script>
-    <script src="script.js"></script>
+    </div>
+        
+    <script src="gameFunctions.js"></script>  
+    <script src="questions.js"></script>  
+    <script src="script.js"></script>   
 
 </body>
 
