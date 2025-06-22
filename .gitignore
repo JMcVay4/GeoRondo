@@ -1,0 +1,21 @@
+# Ignore node_modules in all subdirectories
+**/node_modules
+
+# Ignore build and cache folders from Vite/React
+**/dist
+**/.vite
+
+# Ignore environment variable files
+**/.env
+
+# Ignore macOS junk
+.DS_Store
+
+# Ignore log files
+*.log
+
+# Ignore VSCode settings
+.vscode/
+
+# Optional: Ignore Prisma client build output
+**/prisma/generated
