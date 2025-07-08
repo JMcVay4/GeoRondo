@@ -3,7 +3,10 @@ import questionBank from './questions';
 import { jwtDecode } from 'jwt-decode';
 
 export const GameContext = createContext(null);
-
+const getTodayDateString = () => {
+  const today = new Date();
+  return today.toISOString().slice(0, 10); 
+};
 const getTodayIndex = () => {
   const today = new Date();
   const start = new Date("2025-01-01");
@@ -114,69 +117,88 @@ export const GameProvider = ({ children }) => {
     const pool = (questionBank[letter] || []).filter(q => q.difficulty === selectedDifficulty);
     return pool[Math.floor(Math.random() * pool.length)];
   };
-  const setNextQuestion = (index = currentLetterIndex) => {
+  const setNextQuestion = (
+    index = currentLetterIndex,
+    isDaily = dailyMode,
+    dailyQs = dailyQuestions
+  ) => {
     if (index >= alphabet.length) {
       if (skippedLetters.length > 0) {
         setSkipMode(true);
         setCurrentLetterIndex(skippedLetters[0]);
         setCurrentQuestion(savedSkippedQuestions[0]);
       } else {
+        setCurrentQuestion(null);
         endGame();
       }
       return;
     }
+
     const letter = alphabet[index];
-    const question = dailyMode ? dailyQuestions[index] : getRandomQuestion(letter);
+    const question = isDaily ? dailyQs[index] : getRandomQuestion(letter);
     setCurrentQuestion(question);
   };
-  const resetGameState = (isDaily = false) => {
-    setCurrentLetterIndex(0);
-    setSkipsRemaining(3);
-    setPlayerAnswers([]);
-    setTotalTime(150);
-    setGameActive(true);
-    setGameOverData(null);
-    setSkippedLetters([]);
-    setSavedSkippedQuestions([]);
-    setSkipMode(false);
-    setDailyMode(isDaily);
-    if (isDaily) setDailyQuestions(getDailyQuestions());
-    setNextQuestion(0);
-  };
+
+
+const resetGameState = (isDaily = false) => {
+  setCurrentLetterIndex(0);
+  setSkipsRemaining(3);
+  setPlayerAnswers([]);
+  setTotalTime(150);
+  setGameActive(true);
+  setGameOverData(null);
+  setSkippedLetters([]);
+  setSavedSkippedQuestions([]);
+  setSkipMode(false);
+  setDailyMode(isDaily);
+  if (isDaily) {
+    const dailyQs = getDailyQuestions();
+    setDailyQuestions(dailyQs);
+    setNextQuestion(0, true, dailyQs); // pass dailyQs to avoid async issues
+  } else {
+    setNextQuestion(0, false, null);
+  }
+};
+
   const startGame = () => resetGameState(false);
   const startDailyChallenge = () => resetGameState(true);
 
-  const handleSubmit = (input) => {
-    if (!gameActive || !currentQuestion) return;
-    const answer = input.trim();
-    const isCorrect = currentQuestion.correctAnswers.some(
-      correct => correct.toLowerCase() === answer.toLowerCase()
-    );
-    const entry = {
-      letter: alphabet[currentLetterIndex],
-      question: currentQuestion.question,
-      userAnswer: answer,
-      wasCorrect: isCorrect,
-      correctAnswers: currentQuestion.correctAnswers,
-    };
-    setPlayerAnswers(prev => [...prev, entry]);
-    if (skipMode) {
-      const newSkipped = skippedLetters.slice(1);
-      const newSaved = savedSkippedQuestions.slice(1);
-      setSkippedLetters(newSkipped);
-      setSavedSkippedQuestions(newSaved);
-      if (newSkipped.length > 0) {
-        setCurrentLetterIndex(newSkipped[0]);
-        setCurrentQuestion(newSaved[0]);
-      } else {
-        endGame();
-      }
-    } else {
-      const nextIndex = currentLetterIndex + 1;
-      setCurrentLetterIndex(nextIndex);
-      setNextQuestion(nextIndex);
-    }
+ const handleSubmit = (input) => {
+  if (!gameActive || !currentQuestion) return;
+  const answer = input.trim();
+  const isCorrect = currentQuestion.correctAnswers.some(
+    correct => correct.toLowerCase() === answer.toLowerCase()
+  );
+
+  const entry = {
+    letter: alphabet[currentLetterIndex],
+    question: currentQuestion.question,
+    userAnswer: answer,
+    wasCorrect: isCorrect,
+    correctAnswers: currentQuestion.correctAnswers,
   };
+
+  setPlayerAnswers((prev) => [...prev, entry]);
+
+  if (skipMode) {
+    const newSkipped = skippedLetters.slice(1);
+    const newSaved = savedSkippedQuestions.slice(1);
+    setSkippedLetters(newSkipped);
+    setSavedSkippedQuestions(newSaved);
+
+    if (newSkipped.length > 0) {
+      setCurrentLetterIndex(newSkipped[0]);
+      setCurrentQuestion(newSaved[0]);
+    } else {
+      endGame(); // ✅ Ends game after last skipped question
+    }
+  } else {
+    const nextIndex = currentLetterIndex + 1;
+    setCurrentLetterIndex(nextIndex);
+    setNextQuestion(nextIndex); // This will automatically handle switching to skip mode
+  }
+};
+
   const handleSkip = () => {
     if (!gameActive || skipsRemaining <= 0) return;
     const letter = alphabet[currentLetterIndex];
@@ -197,6 +219,7 @@ export const GameProvider = ({ children }) => {
   };
   const endGame = () => {
     setGameActive(false);
+    setCurrentQuestion(null); 
     const score = playerAnswers.filter(a => a.wasCorrect).length;
     const timeUsed = 150 - totalTime;
     setGameOverData({ completed: score, totalTimeUsed: timeUsed });
@@ -238,6 +261,7 @@ export const GameProvider = ({ children }) => {
         playerAnswers,
         handleSubmit,
         handleSkip,
+        skipsRemaining,
         endGame,
         dailyMode,
         gameOverData

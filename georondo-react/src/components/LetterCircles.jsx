@@ -6,16 +6,18 @@ const radius = containerSize * 0.25;
 const center = containerSize / 2;
 
 export default function LetterCircles() {
-  const { alphabet, currentLetterIndex, playerAnswers, skippedLetters } = useGame();
+  const { alphabet, currentLetterIndex, playerAnswers, skippedLetters, skipMode } = useGame();
 
   const getStatus = (index) => {
+    if (index === currentLetterIndex) return "active";
+
     const answer = playerAnswers.find(ans => ans.letter === alphabet[index]);
     if (answer) {
       if (answer.wasCorrect) return "completed";
       if (answer.userAnswer === "") return "skipped";
       return "incorrect";
     }
-    if (index === currentLetterIndex) return "active";
+
     return "";
   };
 

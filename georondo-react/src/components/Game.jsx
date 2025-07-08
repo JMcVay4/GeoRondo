@@ -45,13 +45,12 @@ function Game({ onEndGame }) {
   useEffect(() => {
     const gameOver =
       !gameActive &&
-      (currentLetterIndex >= alphabet.length ||
-        (skipMode && skippedLetters.length === 0));
+      (!currentQuestion || currentLetterIndex >= alphabet.length || (skipMode && skippedLetters.length === 0));
 
     if (gameOver) {
       onEndGame(playerAnswers);
     }
-  }, [gameActive, currentLetterIndex, skippedLetters, skipMode, playerAnswers]);
+  }, [gameActive, currentLetterIndex, skippedLetters, skipMode, playerAnswers, currentQuestion, alphabet.length, onEndGame]);
 
   return (
     <div id="game-ui">
