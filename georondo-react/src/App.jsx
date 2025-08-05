@@ -1,19 +1,28 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
+import { io } from 'socket.io-client';
 import { GameContext } from './GameContext';
-import NavBar from "./components/navbar";
-import Game from "./components/game";
+import NavBar from "./components/NavBar";
+import Game from "./components/Game";
 import Summary from "./components/Summary";
-import Leaderboard from "./components/leaderboard";
-import LoginModal from "./components/loginModal";
-import HowToPlay from "./components/howToPlay";
+import Leaderboard from "./components/Leaderboard";
+import LoginModal from "./components/LoginModal";
+import HowToPlay from "./components/HowToPlay";
 import LetterCircles from "./components/LetterCircles";
 import GameOverMenu from './components/GameOverMenu';
+import MultiplayerLobby from './components/MultiplayerLobby';
+import MultiplayerGame from './components/MultiplayerGame';
+import MultiplayerResults from './components/MultiplayerResults';
 import "./assets/styles.css";
 
 function App() {
   const [currentView, setCurrentView] = useState('start');
   const [previousView, setPreviousView] = useState('start');
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [socket, setSocket] = useState(null);
+  const [multiplayerRoom, setMultiplayerRoom] = useState(null);
+  const [multiplayerResults, setMultiplayerResults] = useState(null);
+  const [multiplayerMode, setMultiplayerMode] = useState(null);
+
   const {
     startGame,
     startDailyChallenge,
@@ -22,34 +31,84 @@ function App() {
     user,
     logout
   } = useContext(GameContext);
+
+  useEffect(() => {
+    const newSocket = io('http://localhost:3001');
+    setSocket(newSocket);
+    return () => newSocket.close();
+  }, []);
+
   const handleNavigate = (view) => {
-    if (['leaderboard', 'howto'].includes(view)) {
-      setPreviousView(currentView);
-    }
+    if (['leaderboard', 'howto'].includes(view)) setPreviousView(currentView);
     setCurrentView(view);
   };
-  const handleBack = () => {
-    setCurrentView(previousView);
-  };
+
+  const handleBack = () => setCurrentView(previousView);
+
   const handleStartGame = () => {
     if (startGame) startGame(selectedDifficulty);
     setCurrentView('game');
   };
+
   const handleDailyChallengeStart = () => {
     if (startDailyChallenge) startDailyChallenge();
     setCurrentView('game');
   };
+
   const handlePlayAgain = () => {
     if (startGame) startGame(selectedDifficulty);
     setCurrentView('game');
   };
-  const showCircle = !['howto', 'leaderboard'].includes(currentView);
+
+  const handleStartMultiplayerGame = (room) => {
+    setMultiplayerRoom(room);
+    setCurrentView('multiplayer-game');
+  };
+
+  const handleMultiplayerGameEnd = (results) => {
+    setMultiplayerResults(results);
+    setCurrentView('multiplayer-results');
+  };
+
+  const handleBackToMultiplayerLobby = () => {
+    setMultiplayerResults(null);
+    // Do NOT clear multiplayerRoom here
+    setCurrentView('multiplayer-lobby');
+  };
+
+  const handleBackToMainMenu = () => {
+    setMultiplayerRoom(null);
+    setMultiplayerResults(null);
+    setCurrentView('start');
+  };
+
+  const handleCreateRoom = () => {
+    if (socket && user?.username) {
+      setMultiplayerMode('create');
+      setCurrentView('multiplayer-lobby');
+      socket.emit('create-room', {
+        username: user.username,
+        difficulty: selectedDifficulty
+      });
+    } else {
+      setShowLoginModal(true);
+    }
+  };
+
+  const handleJoinRoom = () => {
+    setMultiplayerMode('join');
+    setCurrentView('multiplayer-lobby');
+  };
+
+  const showCircle = !['howto', 'leaderboard', 'multiplayer-results', 'multiplayer-lobby'].includes(currentView);
   const showSideCards = ['start', 'summary'].includes(currentView);
+
   return (
     <>
       <video src="/starbackground.mp4" muted loop autoPlay playsInline id="background-video" />
       <div id="blue-tint" />
-      {showCircle && <LetterCircles />}
+      {showCircle && currentView !== 'multiplayer-game' && <LetterCircles />}
+
 
       <NavBar
         onShowLogin={() => setShowLoginModal(true)}
@@ -65,11 +124,25 @@ function App() {
               <div className="card">
                 <h2>🌍 Daily Challenge</h2>
                 <p>Same challenge for everyone!</p>
-                <button id="daily-button" onClick={handleDailyChallengeStart} className="big-play-button">
-                  Play
-                </button>
+                <button id="daily-button" onClick={handleDailyChallengeStart} className="big-play-button">Play</button>
+              </div>
+
+              <div className="card">
+                <h2>👥 Multiplayer</h2>
+                <p>Challenge your friends!</p>
+                {user?.username ? (
+                  <div className="button-row">
+                    <button onClick={handleCreateRoom} className="big-play-button">Create Room</button>
+                    <button onClick={handleJoinRoom} className="big-play-button">Join Room</button>
+                  </div>
+                ) : (
+                  <button id="multiplayer-button" className="big-play-button" onClick={() => setShowLoginModal(true)}>
+                    Login Required
+                  </button>
+                )}
               </div>
             </div>
+
             <div className="main-menu">
               {currentView === 'start' && (
                 <>
@@ -97,6 +170,7 @@ function App() {
               )}
               {currentView === 'summary' && <GameOverMenu onPlayAgain={handlePlayAgain} />}
             </div>
+
             <div className="sidebar right">
               <div className="card">
                 <h2>Leaderboard</h2>
@@ -108,9 +182,38 @@ function App() {
             </div>
           </div>
         )}
-        {currentView === 'game' && <Game onEndGame={() => handleNavigate('summary')} />}
+
+        {currentView === 'game' && (
+          <Game onEndGame={() => setCurrentView('summary')} />
+        )}
+        {currentView === 'multiplayer-game' && (
+          <MultiplayerGame
+            socket={socket}
+            room={multiplayerRoom}
+            onGameEnd={handleMultiplayerGameEnd}
+          />
+        )}
         {currentView === 'summary' && (
           <Summary user={user} onShowLogin={() => setShowLoginModal(true)} />
+        )}
+        {currentView === 'multiplayer-lobby' && (
+          <MultiplayerLobby
+            socket={socket}
+            onBack={() => setCurrentView('start')}
+            onStartMultiplayerGame={handleStartMultiplayerGame}
+            mode={multiplayerMode}
+            room={multiplayerRoom}
+          />
+        )}
+
+        {currentView === 'multiplayer-results' && (
+          <MultiplayerResults
+            results={multiplayerResults}
+            onBackToLobby={handleBackToMultiplayerLobby}
+            onBackToMenu={handleBackToMainMenu}
+            socket={socket}
+            roomCode={multiplayerRoom?.code}
+          />
         )}
         {currentView === 'leaderboard' && <Leaderboard onBack={handleBack} />}
         {currentView === 'howto' && <HowToPlay onBack={handleBack} />}
@@ -120,4 +223,5 @@ function App() {
     </>
   );
 }
+
 export default App;
