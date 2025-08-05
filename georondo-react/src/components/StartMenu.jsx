@@ -1,75 +1,133 @@
 import React from 'react';
 import { useGame } from '../GameContext';
 
-function StartMenu({ onStartGame, onStartDailyChallenge, onShowLeaderboard, onHowToPlay }) {
-  const { selectedDifficulty, setSelectedDifficulty, gameActive } = useGame();
+function StartMenu() {
+  const {
+    startGame,
+    difficulty,
+    setDifficulty,
+    setView,
+    user,
+    setMultiplayerMode,
+    multiplayerMode,
+    setMultiplayerRoomCode,
+  } = useGame();
+
+  const handleCreateClick = () => {
+    if (!user) {
+      setView('login');
+    } else {
+      setMultiplayerMode('create');
+    }
+  };
+
+  const handleJoinClick = () => {
+    if (!user) {
+      setView('login');
+    } else {
+      setMultiplayerMode('join');
+    }
+  };
+
+  const handleBackToMain = () => {
+    setMultiplayerMode(null);
+    setMultiplayerRoomCode('');
+  };
+
   return (
-    <div id="start-screen" className="flex flex-col items-center text-white">
-      <div className="dashboard-container grid grid-cols-[minmax(350px,_1fr)_1fr_minmax(350px,_1fr)] gap-10 p-[100px_60px_40px] max-w-[1400px] mx-auto w-full box-border min-h-screen items-start relative z-[1]">
-        <div className="sidebar left flex flex-col gap-5 items-start">
-          <div className="card bg-white/10 border border-white/20 rounded-2xl p-5 text-center shadow-[0_0_15px_rgba(0,0,0,0.6)] backdrop-blur text-white mt-5">
-            <h2 className="text-2xl font-bold mb-1">🌍 Daily Challenge</h2>
-            <p className="mb-4">Same challenge for everyone!</p>
-            <button
-              id="daily-button"
-              onClick={onStartDailyChallenge}
-              className="mt-2 px-5 py-2.5 rounded-lg bg-blue-500 text-white font-bold"
-            >
-              Play
-            </button>
+    <div id="start-screen">
+      <div className="dashboard-container">
+        {/* LEFT SIDEBAR */}
+        <div className="sidebar left">
+          <div className="card">
+            <div role="img" aria-label="globe">🌍</div>
+            <div>Daily Challenge</div>
+            <p>Same challenge for everyone!</p>
+            <button onClick={() => setView('daily')}>Play</button>
+          </div>
+
+          <div className="card">
+            <div role="img" aria-label="multiplayer">👥</div>
+            <div>Multiplayer</div>
+            <p>Challenge your friends!</p>
+
+            {multiplayerMode === null && (
+              <>
+                <button onClick={handleCreateClick}>Create Room</button>
+                <button onClick={handleJoinClick}>Join Room</button>
+              </>
+            )}
+
+            {multiplayerMode === 'create' && (
+              <>
+                <p>Creating a new room...</p>
+                <button onClick={handleBackToMain}>Back</button>
+              </>
+            )}
+
+            {multiplayerMode === 'join' && (
+              <>
+                <p>Joining a friend’s room...</p>
+                <button onClick={handleBackToMain}>Back</button>
+              </>
+            )}
           </div>
         </div>
-        <div id="main-menu-container" className="main-menu text-center">
-          <h1 className="title text-[3rem] mb-2 text-white font-bold">GeoRondo</h1>
-          <div id="final-time-display" className="final-time text-white text-xl my-2" />
-          <p className="subtitle text-white text-lg mb-6">
-            Choose your difficulty and begin your round:
-          </p>
+
+        {/* CENTER MENU */}
+        <div className="main-menu">
+          <h1 className="title">GeoRondo</h1>
+          <p className="subtitle">Choose your difficulty and begin your round:</p>
+
           <div className="toggle-difficulty">
-            {['easy', 'medium', 'hard', 'grandmaster'].map((level) => (
-              <React.Fragment key={level}>
-                <input
-                  type="radio"
-                  id={level}
-                  name="difficulty"
-                  value={level}
-                  checked={selectedDifficulty === level}
-                  onChange={() => setSelectedDifficulty(level)}
-                  className="hidden"
-                  disabled={gameActive}
-                />
-                <label
-                  htmlFor={level}
-                  className={`cursor-pointer px-4 py-2 rounded-md font-bold transition-all ${
-                    selectedDifficulty === level
-                      ? 'bg-blue-500 scale-105 text-white'
-                      : 'bg-[#333] text-white'
-                  }`}
-                >
-                  {level.charAt(0).toUpperCase() + level.slice(1)}
-                </label>
-              </React.Fragment>
-            ))}
+            <input
+              type="radio"
+              id="easy"
+              value="easy"
+              checked={difficulty === 'easy'}
+              onChange={() => setDifficulty('easy')}
+            />
+            <label htmlFor="easy">Easy</label>
+
+            <input
+              type="radio"
+              id="medium"
+              value="medium"
+              checked={difficulty === 'medium'}
+              onChange={() => setDifficulty('medium')}
+            />
+            <label htmlFor="medium">Medium</label>
+
+            <input
+              type="radio"
+              id="hard"
+              value="hard"
+              checked={difficulty === 'hard'}
+              onChange={() => setDifficulty('hard')}
+            />
+            <label htmlFor="hard">Hard</label>
+
+            <input
+              type="radio"
+              id="grandmaster"
+              value="grandmaster"
+              checked={difficulty === 'grandmaster'}
+              onChange={() => setDifficulty('grandmaster')}
+            />
+            <label htmlFor="grandmaster">Grandmaster</label>
           </div>
-          <button
-            id="start-button"
-            onClick={onStartGame}
-            className="big-play-button px-7 py-3 text-lg rounded-lg bg-blue-500 text-white font-bold shadow-[0_0_10px_#3399ff] hover:scale-105 transition mb-4"
-          >
+
+          <button className="big-play-button" onClick={startGame}>
             Start Game
           </button>
         </div>
-        <div className="sidebar right flex flex-col gap-5 items-end">
-          <div className="card bg-white/10 border border-white/20 rounded-2xl p-5 text-center shadow-[0_0_15px_rgba(0,0,0,0.6)] backdrop-blur text-white mt-5">
-            <h2 className="text-2xl font-bold mb-1">Leaderboard</h2>
-            <p className="mb-4">See today's top GeoRondo players</p>
-            <button
-              id="show-leaderboard"
-              onClick={onShowLeaderboard}
-              className="mt-2 px-5 py-2.5 rounded-lg bg-blue-500 text-white font-bold"
-            >
-              View
-            </button>
+
+        {/* RIGHT SIDEBAR */}
+        <div className="sidebar right">
+          <div className="card">
+            <div>Leaderboard</div>
+            <p>See today's top GeoRondo players</p>
+            <button onClick={() => setView('leaderboard')}>View</button>
           </div>
         </div>
       </div>

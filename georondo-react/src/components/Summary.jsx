@@ -26,34 +26,42 @@ const Summary = ({ user, onShowLogin }) => {
         )}
       </div>
 
-      <div id="summary-container" className="w-full max-w-4xl mx-auto">
+      <div id="summary-container" className="difficulty-board w-full max-w-4xl mx-auto">
         <h2 className="!text-white text-center w-full text-2xl mb-4">Game Summary</h2>
-        <table className="w-full border-collapse shadow-lg rounded-md overflow-hidden bg-white">
+        <table className="w-full text-left text-white">
           <thead>
-            <tr className="bg-[#0b1635] text-white">
-              <th className="p-3 text-left">Letter</th>
-              <th className="p-3 text-left">Question</th>
-              <th className="p-3 text-left">Your Answer</th>
-              <th className="p-3 text-left">Status</th>
-              <th className="p-3 text-left">Correct Answer</th>
+            <tr className="bg-white/10">
+              <th className="p-2">Letter</th>
+              <th className="p-2">Question</th>
+              <th className="p-2">Your Answer</th>
+              <th className="p-2">Status</th>
+              <th className="p-2">Correct Answer</th>
             </tr>
           </thead>
           <tbody>
-            {playerAnswers.map((answer, index) => (
-              <tr key={index} className="bg-gray-100 text-black">
-                <td className="p-3">{answer.letter}</td>
-                <td className="p-3">{answer.question}</td>
-                <td className="p-3">{answer.userAnswer || 'Skipped'}</td>
-                <td className="p-3">
-                  {answer.wasCorrect
-                    ? 'Correct'
-                    : answer.userAnswer === ''
-                    ? 'Skipped'
-                    : 'Incorrect'}
+            {playerAnswers && playerAnswers.length > 0 ? (
+              playerAnswers.map((answer, index) => (
+                <tr key={index} className="border-b border-white/10 text-white">
+                  <td className="p-2">{answer.letter}</td>
+                  <td className="p-2">{answer.question}</td>
+                  <td className="p-2">{answer.userAnswer || 'Skipped'}</td>
+                  <td className="p-2">
+                    {answer.wasCorrect
+                      ? 'Correct'
+                      : answer.userAnswer === ''
+                      ? 'Skipped'
+                      : 'Incorrect'}
+                  </td>
+                  <td className="p-2">{answer.correctAnswers.join(', ')}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="5" className="p-4 text-center text-white">
+                  No answers recorded.
                 </td>
-                <td className="p-3">{answer.correctAnswers.join(', ')}</td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </div>

@@ -9,18 +9,16 @@ body {
 }
 
 .game-container {
-  position: relative;
-  top: auto;
-  left: auto;
-  transform: none;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   z-index: 2;
   text-align: center;
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 100vw;
-  min-height: 60vh;
-  padding: 2rem 0;
+  justify-content: center;
 }
 
 .letter-circles {
@@ -40,16 +38,29 @@ body {
 }
 
 .center-content {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  max-width: 400px;
   text-align: center;
-  position: relative;
-  z-index: 2;
+  max-width: 400px;
+  left: 5px;
 }
-
+.game-center-wrapper {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
 .letter {
   position: absolute;
   width: 50px;
@@ -114,6 +125,8 @@ body {
   margin: 10px auto;
   text-align: center;
   border-radius: 8px;
+  background-color: #2b2b2b;
+  border: 1px solid #666; 
 }
 
 #skip-button {
@@ -309,23 +322,26 @@ td {
 
 .dashboard-container {
   display: grid;
-  grid-template-columns: minmax(350px, 1fr) 1fr minmax(350px, 1fr);
-  gap: 40px;
-  padding: 100px 60px 40px;
+  grid-template-columns: 320px auto 320px;
+  gap: 60px; /* Increased from 40px */
+  padding: 80px 20px 40px; /* Reduced left/right padding from 40px to 20px */
+  align-items: start;
+  max-width: 1600px; /* Increased from 1400px to allow more spread */
+  margin: 0 auto;
   position: relative;
   z-index: 1;
   box-sizing: border-box;
-  align-items: start;
-  max-width: 1400px;
-  margin: 0 auto;
 }
 .sidebar {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  justify-content: center;
 }
 .sidebar.left {
-  align-items: flex-start;
+  align-items: center;
+  width: 260px;
+  
 }
 .sidebar.right {
   align-items: flex-end;
@@ -341,19 +357,32 @@ td {
   backdrop-filter: blur(6px);
   color: white;
   margin-top: 20px;
+  
+
 }
 .card button {
+  width: 60%;
   margin-top: 10px;
-  padding: 10px 20px; 
+  padding: 10px 14px; 
   border-radius: 10px;
   background-color: #3399ff;
   color: white;
   font-weight: bold;
   cursor: pointer;
 }
+.button-row {
+  display: flex;
+  gap: 12px; 
+  justify-content: center;
+  margin-top: 10px;
+}
+
 .main-menu {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   text-align: center;
-  
 }
 .title {
   font-size: 3rem;
@@ -453,6 +482,8 @@ td {
   padding: 10px;
   border-radius: 5px;
   border: none;
+  background-color: #2b2b2b;
+  border: 1px solid #666;
 }
 .auth-card button {
   padding: 10px;

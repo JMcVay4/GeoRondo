@@ -1,274 +1,294 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import io from 'socket.io-client';
 import questionBank from './questions';
-import { jwtDecode } from 'jwt-decode';
 
-export const GameContext = createContext(null);
-const getTodayDateString = () => {
-  const today = new Date();
-  return today.toISOString().slice(0, 10); 
-};
-const getTodayIndex = () => {
-  const today = new Date();
-  const start = new Date("2025-01-01");
-  return Math.floor((today - start) / (1000 * 60 * 60 * 24));
-};
+export const GameContext = createContext();
 
-const getDailyQuestions = () => {
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-  const index = getTodayIndex();
-  return alphabet.map(letter => {
-    const pool = (questionBank[letter] || []).filter(q => q.difficulty === 'easy');
-    return pool.length > 0 ? pool[index % pool.length] : {
-      question: `No question for ${letter}`,
-      correctAnswers: [''],
-      difficulty: 'easy'
-    };
-  });
+export const useGame = () => {
+  const context = useContext(GameContext);
+  if (!context) {
+    throw new Error('useGame must be used within a GameProvider');
+  }
+  return context;
 };
 
 export const GameProvider = ({ children }) => {
-  const [token, setToken] = useState(localStorage.getItem('token'));
   const [user, setUser] = useState(null);
-  const [alphabet] = useState('ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''));
+  const [socket, setSocket] = useState(null);
+  const [currentView, setCurrentView] = useState('start');
   const [selectedDifficulty, setSelectedDifficulty] = useState('easy');
-  const [totalTime, setTotalTime] = useState(150);
-  const [gameActive, setGameActive] = useState(false);
+  const [alphabet] = useState('ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''));
   const [currentLetterIndex, setCurrentLetterIndex] = useState(0);
-  const [currentQuestion, setCurrentQuestion] = useState(null);
   const [playerAnswers, setPlayerAnswers] = useState([]);
   const [skipsRemaining, setSkipsRemaining] = useState(3);
+  const [totalTime, setTotalTime] = useState(0);
+  const [gameActive, setGameActive] = useState(false);
+  const [currentQuestion, setCurrentQuestion] = useState(null);
   const [skippedLetters, setSkippedLetters] = useState([]);
   const [savedSkippedQuestions, setSavedSkippedQuestions] = useState([]);
   const [skipMode, setSkipMode] = useState(false);
-  const [dailyMode, setDailyMode] = useState(false);
-  const [dailyQuestions, setDailyQuestions] = useState([]);
+  const [multiplayerRoom, setMultiplayerRoom] = useState(null);
+  const [multiplayerResults, setMultiplayerResults] = useState(null);
+  const [multiplayerMode, setMultiplayerMode] = useState(null);
   const [gameOverData, setGameOverData] = useState(null);
-  const [pendingScore, setPendingScore] = useState(null);
 
   useEffect(() => {
-    if (token) {
-      try {
-        const decoded = jwtDecode(token);
-        setUser({ username: decoded.username });
-      } catch {
-        setToken(null);
-        setUser(null);
-        localStorage.removeItem('token');
-      }
+    const newSocket = io('http://localhost:3001');
+    setSocket(newSocket);
+    return () => newSocket.close();
+  }, []);
+
+  useEffect(() => {
+    let timer;
+    if (gameActive && totalTime > 0) {
+      timer = setInterval(() => {
+        setTotalTime(prev => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            endGame();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
     }
-  }, [token]);
+    return () => clearInterval(timer);
+  }, [gameActive, totalTime]);
 
-  const login = async (username, password) => {
-    const res = await fetch('http://localhost:3001/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
-    });
-
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Login failed');
-
-    localStorage.setItem('token', data.token);
-    setToken(data.token);
-    setUser({ username: jwtDecode(data.token).username });
-
-    if (pendingScore) {
-      await submitScore(pendingScore.score, pendingScore.time, pendingScore.difficulty);
-      setPendingScore(null);
+  useEffect(() => {
+    const savedUser = localStorage.getItem('user');
+    if (savedUser) {
+      setUser(JSON.parse(savedUser));
     }
-  };
-
-  const register = async (username, password) => {
-    const res = await fetch('http://localhost:3001/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Registration failed');
-    return data;
-  };
+  }, []);
 
   const logout = () => {
-    localStorage.removeItem('token');
-    setToken(null);
     setUser(null);
+    localStorage.removeItem('user');
+    setCurrentView('start');
   };
 
-  const submitScore = async (score, time, difficulty) => {
-    if (!token) {
-      setPendingScore({ score, time, difficulty });
-      return;
-    }
+  const handleGoogleSignIn = async (response) => {
     try {
-      await fetch('http://localhost:3001/submit', {
+      const res = await fetch('http://localhost:3001/auth/google', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ score, time, difficulty })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: response.credential }),
       });
-    } catch (e) {
-      console.error('Score submission failed:', e);
+      if (res.ok) {
+        const data = await res.json();
+        console.log('Google sign-in response:', data); // Debug log
+        
+        // Store the full user object including the database ID
+        const userObject = {
+          id: data.user.id, // Database ID for score submission
+          username: data.user.name || data.user.email || 'GoogleUser',
+          email: data.user.email,
+          name: data.user.name,
+          picture: data.user.picture
+        };
+        
+        setUser(userObject);
+        localStorage.setItem('user', JSON.stringify(userObject));
+        console.log('User stored:', userObject); // Debug log
+      } else {
+        console.error('Google sign-in failed');
+      }
+    } catch (error) {
+      console.error('Google sign-in error:', error);
     }
   };
-  const getRandomQuestion = (letter) => {
-    const pool = (questionBank[letter] || []).filter(q => q.difficulty === selectedDifficulty);
-    return pool[Math.floor(Math.random() * pool.length)];
-  };
-  const setNextQuestion = (
-    index = currentLetterIndex,
-    isDaily = dailyMode,
-    dailyQs = dailyQuestions
-  ) => {
-    if (index >= alphabet.length) {
-      if (skippedLetters.length > 0) {
-        setSkipMode(true);
-        setCurrentLetterIndex(skippedLetters[0]);
-        setCurrentQuestion(savedSkippedQuestions[0]);
-      } else {
-        setCurrentQuestion(null);
-        endGame();
-      }
+
+  const submitScore = async (score, timeUsed, difficulty) => {
+    if (!user || !user.id) {
+      console.log('No user or user ID for score submission');
       return;
     }
 
-    const letter = alphabet[index];
-    const question = isDaily ? dailyQs[index] : getRandomQuestion(letter);
-    setCurrentQuestion(question);
-  };
+    console.log('Submitting score:', { score, timeUsed, difficulty, userId: user.id }); // Debug log
 
+    try {
+      const response = await fetch('http://localhost:3001/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          score,
+          time: timeUsed,
+          difficulty,
+          userId: user.id
+        })
+      });
 
-const resetGameState = (isDaily = false) => {
-  setCurrentLetterIndex(0);
-  setSkipsRemaining(3);
-  setPlayerAnswers([]);
-  setTotalTime(150);
-  setGameActive(true);
-  setGameOverData(null);
-  setSkippedLetters([]);
-  setSavedSkippedQuestions([]);
-  setSkipMode(false);
-  setDailyMode(isDaily);
-  if (isDaily) {
-    const dailyQs = getDailyQuestions();
-    setDailyQuestions(dailyQs);
-    setNextQuestion(0, true, dailyQs); // pass dailyQs to avoid async issues
-  } else {
-    setNextQuestion(0, false, null);
-  }
-};
-
-  const startGame = () => resetGameState(false);
-  const startDailyChallenge = () => resetGameState(true);
-
- const handleSubmit = (input) => {
-  if (!gameActive || !currentQuestion) return;
-  const answer = input.trim();
-  const isCorrect = currentQuestion.correctAnswers.some(
-    correct => correct.toLowerCase() === answer.toLowerCase()
-  );
-
-  const entry = {
-    letter: alphabet[currentLetterIndex],
-    question: currentQuestion.question,
-    userAnswer: answer,
-    wasCorrect: isCorrect,
-    correctAnswers: currentQuestion.correctAnswers,
-  };
-
-  setPlayerAnswers((prev) => [...prev, entry]);
-
-  if (skipMode) {
-    const newSkipped = skippedLetters.slice(1);
-    const newSaved = savedSkippedQuestions.slice(1);
-    setSkippedLetters(newSkipped);
-    setSavedSkippedQuestions(newSaved);
-
-    if (newSkipped.length > 0) {
-      setCurrentLetterIndex(newSkipped[0]);
-      setCurrentQuestion(newSaved[0]);
-    } else {
-      endGame(); // ✅ Ends game after last skipped question
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Score submission result:', result);
+      } else {
+        console.error('Score submission failed:', response.status);
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+      }
+    } catch (error) {
+      console.error('Score submission error:', error);
     }
-  } else {
-    const nextIndex = currentLetterIndex + 1;
-    setCurrentLetterIndex(nextIndex);
-    setNextQuestion(nextIndex); // This will automatically handle switching to skip mode
-  }
-};
+  };
+
+  const startGame = () => {
+    setCurrentView('game');
+    setGameActive(true);
+    setCurrentLetterIndex(0);
+    setPlayerAnswers([]);
+    setSkipsRemaining(3);
+    setTotalTime(150);
+    setSkippedLetters([]);
+    setSavedSkippedQuestions([]);
+    setSkipMode(false);
+    setGameOverData(null);
+    setCurrentQuestion(getQuestionForLetter(alphabet[0]));
+  };
+
+  const handleSubmit = (answer) => {
+    if (!gameActive || !currentQuestion) return;
+
+    const isCorrect = currentQuestion.correctAnswers.some(
+      correct => correct.toLowerCase() === answer.toLowerCase()
+    );
+
+    const newEntry = {
+      letter: alphabet[currentLetterIndex],
+      question: currentQuestion.question,
+      userAnswer: answer,
+      wasCorrect: isCorrect,
+      correctAnswers: currentQuestion.correctAnswers
+    };
+
+    const isFinalZ = !skipMode && currentLetterIndex === alphabet.length - 1 && skippedLetters.length === 0;
+    const isFinalSkipped = skipMode && skippedLetters.length === 0;
+
+    setPlayerAnswers(prev => [...prev, newEntry]);
+
+    if (isFinalZ || isFinalSkipped) {
+      setTimeout(() => endGame(), 0);
+    } else {
+      setNextQuestion();
+    }
+  };
 
   const handleSkip = () => {
     if (!gameActive || skipsRemaining <= 0) return;
-    const letter = alphabet[currentLetterIndex];
-    setPlayerAnswers(prev => [...prev, {
-      letter,
-      question: currentQuestion.question,
-      userAnswer: '',
-      wasCorrect: false,
-      correctAnswers: currentQuestion.correctAnswers
-    }]);
+
+    setPlayerAnswers(prev => [
+      ...prev,
+      {
+        letter: alphabet[currentLetterIndex],
+        question: currentQuestion.question,
+        userAnswer: '',
+        wasCorrect: false,
+        correctAnswers: currentQuestion.correctAnswers
+      }
+    ]);
+
     setSkippedLetters(prev => [...prev, currentLetterIndex]);
     setSavedSkippedQuestions(prev => [...prev, currentQuestion]);
     setSkipsRemaining(prev => prev - 1);
 
-    const nextIndex = currentLetterIndex + 1;
-    setCurrentLetterIndex(nextIndex);
-    setNextQuestion(nextIndex);
+    setNextQuestion();
   };
+
+  const setNextQuestion = () => {
+    const nextIndex = currentLetterIndex + 1;
+
+    if (!skipMode && nextIndex < alphabet.length) {
+      // Regular progression
+      setCurrentLetterIndex(nextIndex);
+      setCurrentQuestion(getQuestionForLetter(alphabet[nextIndex]));
+    } else if (!skipMode && nextIndex >= alphabet.length && skippedLetters.length > 0) {
+      // Entering skip mode after Z
+      setSkipMode(true);
+      const [firstSkipped, ...restSkipped] = skippedLetters;
+      const [firstQuestion, ...restQuestions] = savedSkippedQuestions;
+      setCurrentLetterIndex(firstSkipped);
+      setCurrentQuestion(firstQuestion);
+      setSkippedLetters(restSkipped);
+      setSavedSkippedQuestions(restQuestions);
+    } else if (skipMode && skippedLetters.length > 0) {
+      // Continue skipped questions
+      const [nextSkipped, ...restSkipped] = skippedLetters;
+      const [nextQuestion, ...restQuestions] = savedSkippedQuestions;
+      setCurrentLetterIndex(nextSkipped);
+      setCurrentQuestion(nextQuestion);
+      setSkippedLetters(restSkipped);
+      setSavedSkippedQuestions(restQuestions);
+    } else {
+      // All questions completed, including skips
+      endGame();
+    }
+  };
+
+  const getQuestionForLetter = (letter) => {
+    const pool = questionBank[letter]?.filter(q => q.difficulty === selectedDifficulty);
+    if (!pool || pool.length === 0) return null;
+    const randomIndex = Math.floor(Math.random() * pool.length);
+    return pool[randomIndex];
+  };
+
   const endGame = () => {
     setGameActive(false);
-    setCurrentQuestion(null); 
-    const score = playerAnswers.filter(a => a.wasCorrect).length;
-    const timeUsed = 150 - totalTime;
-    setGameOverData({ completed: score, totalTimeUsed: timeUsed });
-    const difficulty = dailyMode ? 'daily' : selectedDifficulty;
-    if (user?.username) submitScore(score, timeUsed, difficulty);
+    
+    // Calculate game stats
+    const totalTimeUsed = 150 - totalTime;
+    const finalScore = playerAnswers.filter(answer => answer.wasCorrect).length;
+    
+    setGameOverData({
+      totalTimeUsed: totalTimeUsed
+    });
+
+    console.log('Game ended. Final score:', finalScore, 'Time used:', totalTimeUsed); // Debug log
+
+    // Submit score to leaderboard if user is logged in
+    if (user && user.id) {
+      submitScore(finalScore, totalTimeUsed, selectedDifficulty);
+    } else {
+      console.log('User not logged in, not submitting score');
+    }
   };
-  useEffect(() => {
-    if (!gameActive) return;
-    const interval = setInterval(() => {
-      setTotalTime(prev => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          endGame();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [gameActive]);
-  
+
+  const value = {
+    user,
+    setUser,
+    socket,
+    currentView,
+    setCurrentView,
+    selectedDifficulty,
+    setSelectedDifficulty,
+    alphabet,
+    currentLetterIndex,
+    playerAnswers,
+    skipsRemaining,
+    totalTime,
+    setTotalTime,
+    gameActive,
+    currentQuestion,
+    skippedLetters,
+    skipMode,
+    multiplayerRoom,
+    setMultiplayerRoom,
+    multiplayerResults,
+    setMultiplayerResults,
+    multiplayerMode,
+    setMultiplayerMode,
+    gameOverData,
+    handleGoogleSignIn,
+    logout,
+    startGame,
+    handleSubmit,
+    handleSkip,
+    setNextQuestion,
+    endGame
+  };
+
   return (
-    <GameContext.Provider
-      value={{
-        token,
-        user,
-        login,
-        logout,
-        register,
-        alphabet,
-        selectedDifficulty,
-        setSelectedDifficulty,
-        startGame,
-        startDailyChallenge,
-        currentLetterIndex,
-        totalTime,
-        gameActive,
-        currentQuestion,
-        playerAnswers,
-        handleSubmit,
-        handleSkip,
-        skipsRemaining,
-        endGame,
-        dailyMode,
-        gameOverData
-      }}
-    >
+    <GameContext.Provider value={value}>
       {children}
     </GameContext.Provider>
   );
 };
-export const useGame = () => useContext(GameContext);

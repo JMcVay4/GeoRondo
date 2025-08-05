@@ -1,5 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useGame } from '../GameContext';
+import LetterCircles from './LetterCircles';
 
 function Game({ onEndGame }) {
   const {
@@ -20,11 +21,12 @@ function Game({ onEndGame }) {
   } = useGame();
 
   const answerRef = useRef(null);
+  const [currentAnswer, setCurrentAnswer] = useState('');
 
   const submitAnswer = () => {
     if (!gameActive) return;
 
-    const answer = answerRef.current.value.trim();
+    const answer = currentAnswer.trim();
     if (!answer) return;
 
     if (answer.toUpperCase() === 'SKIP') {
@@ -33,7 +35,7 @@ function Game({ onEndGame }) {
       handleSubmit(answer);
     }
 
-    answerRef.current.value = '';
+    setCurrentAnswer('');
   };
 
   useEffect(() => {
@@ -43,51 +45,53 @@ function Game({ onEndGame }) {
   }, [currentLetterIndex, currentQuestion]);
 
   useEffect(() => {
-    const gameOver =
-      !gameActive &&
-      (!currentQuestion || currentLetterIndex >= alphabet.length || (skipMode && skippedLetters.length === 0));
-
-    if (gameOver) {
-      onEndGame(playerAnswers);
-    }
-  }, [gameActive, currentLetterIndex, skippedLetters, skipMode, playerAnswers, currentQuestion, alphabet.length, onEndGame]);
+  // Game ends when gameActive becomes false
+  if (!gameActive) {
+    onEndGame(playerAnswers);
+  }
+}, [gameActive, playerAnswers, onEndGame]);
 
   return (
     <div id="game-ui">
       <div className="game-container">
-        <div className="center-content">
-          <div className="stats">
-            <div className="timer">
-              Time: {Math.floor(totalTime / 60)}:
-              {String(totalTime % 60).padStart(2, '0')}
+        <div className="game-center-wrapper">
+          <div className="center-content">
+            <div className="stats">
+              <div className="timer">
+                Time: {Math.floor(totalTime / 60)}:{String(totalTime % 60).padStart(2, '0')}
+              </div>
+              <div className="skips">Skips: {skipsRemaining} remaining</div>
             </div>
-            <div className="skips">Skips: {skipsRemaining} remaining</div>
-          </div>
 
-          <div className="question-container">
-            <div className="question">{currentQuestion?.question || '...'}</div>
-            <input
-              type="text"
-              id="answer-input"
-              ref={answerRef}
-              placeholder="Type your answer here"
-              disabled={!gameActive}
-              onKeyDown={(e) => e.key === 'Enter' && submitAnswer()}
-            />
-          </div>
+            <div className="question-container">
+              <div className="question">{currentQuestion?.question || '...'}</div>
+              <input
+                type="text"
+                id="answer-input"
+                ref={answerRef}
+                value={currentAnswer}
+                onChange={(e) => setCurrentAnswer(e.target.value)}
+                placeholder="Type your answer here"
+                disabled={!gameActive}
+                onKeyDown={(e) => e.key === 'Enter' && submitAnswer()}
+                className="text-white bg-black/30 px-3 py-2 rounded"
+              />
+            </div>
 
-          <div className="button-container">
-            <button
-              id="skip-button"
-              onClick={handleSkip}
-              disabled={!gameActive || skipsRemaining <= 0}
-            >
-              Skip ({skipsRemaining} left)
-            </button>
+            <div className="button-container">
+              <button
+                id="skip-button"
+                onClick={handleSkip}
+                disabled={!gameActive || skipsRemaining <= 0}
+              >
+                Skip ({skipsRemaining} left)
+              </button>
+            </div>
           </div>
         </div>
       </div>
     </div>
   );
 }
+
 export default Game;

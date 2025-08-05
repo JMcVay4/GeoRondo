@@ -42,19 +42,30 @@ export default function Leaderboard({ onBack }) {
     grandmaster: [],
     daily: [],
   });
+  
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const fetchLeaderboards = async () => {
+      console.log('Fetching leaderboards...');
       const difficulties = ['easy', 'medium', 'hard', 'grandmaster', 'daily'];
       const loadedLeaderboards = {};
 
       for (const diff of difficulties) {
         try {
+          console.log(`Fetching ${diff} leaderboard...`);
           const res = await fetch(`http://localhost:3001/leaderboard?difficulty=${diff}`);
+          console.log(`${diff} response status:`, res.status);
+          
           if (res.ok) {
             const data = await res.json();
+            console.log(`${diff} data:`, data);
             loadedLeaderboards[diff] = data;
           } else {
+            console.error(`Failed to fetch ${diff}: ${res.status} ${res.statusText}`);
+            const errorText = await res.text();
+            console.error(`Error response for ${diff}:`, errorText);
             loadedLeaderboards[diff] = [];
           }
         } catch (err) {
@@ -62,11 +73,22 @@ export default function Leaderboard({ onBack }) {
           loadedLeaderboards[diff] = [];
         }
       }
+      
+      console.log('Final leaderboards:', loadedLeaderboards);
       setLeaderboards(loadedLeaderboards);
+      setLoading(false);
     };
 
     fetchLeaderboards();
   }, []);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center p-8">
+        <h2 className="text-4xl font-bold mb-6 !text-white">Loading Leaderboards...</h2>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center p-8">

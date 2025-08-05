@@ -9,10 +9,14 @@ datasource db {
 }
 
 model User {
-  id                 Int      @id @default(autoincrement())
-  username           String   @unique
-  password           String
-  scores             Score[]
+  id            Int      @id @default(autoincrement())
+  googleId      String   @unique
+  email         String   @unique
+  name          String
+  picture       String?
+  scores        Score[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 model Score {
