@@ -29,7 +29,7 @@ function Game({ onEndGame }) {
     const answer = currentAnswer.trim();
     if (!answer) return;
 
-    if (answer.toUpperCase() === 'SKIP') {
+    if (['SKIP', 'PASS'].includes(answer.toUpperCase())) {
       handleSkip();
     } else {
       handleSubmit(answer);

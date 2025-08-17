@@ -7,13 +7,30 @@ const http = require('http');
 require('dotenv').config();
 
 // Import questions from frontend
-const questionBank = require('../georondo-react/src/questions.js').default;
+const questionBank = require('./questions');
 
 const app = express();
 const server = http.createServer(app);
+
+// Define getAllowedOrigins function FIRST
+const getAllowedOrigins = () => {
+  if (process.env.NODE_ENV === 'production') {
+    return [
+      process.env.FRONTEND_URL || 'https://georondo.com',
+      'https://www.georondo.com'
+    ];
+  } else {
+    return [
+      'http://localhost:5173', 
+      'http://localhost:5174'
+    ];
+  }
+};
+
+// NOW use the function in Socket.io setup
 const io = new Server(server, {
   cors: {
-    origin: ['http://localhost:5174', 'http://localhost:5173'],
+    origin: getAllowedOrigins(),
     methods: ['GET', 'POST'],
     credentials: true
   }
@@ -25,15 +42,15 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 const rooms = new Map();
 
+// Use the function in Express CORS setup too
 app.use(cors({
-  origin: ['http://localhost:5174', 'http://localhost:5173'],
+  origin: getAllowedOrigins(),
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
-app.use(express.json());
 
-// Replace your current /auth/google endpoint with this:
+app.use(express.json());
 
 app.post('/auth/google', async (req, res) => {
   const { token } = req.body;

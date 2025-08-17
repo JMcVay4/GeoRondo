@@ -1,6 +1,7 @@
+// georondo-react/src/App.jsx
 import React, { useState, useContext, useEffect } from 'react';
-import { io } from 'socket.io-client';
 import { GameContext } from './GameContext';
+
 import NavBar from "./components/NavBar";
 import Game from "./components/Game";
 import Summary from "./components/Summary";
@@ -12,31 +13,54 @@ import GameOverMenu from './components/GameOverMenu';
 import MultiplayerLobby from './components/MultiplayerLobby';
 import MultiplayerGame from './components/MultiplayerGame';
 import MultiplayerResults from './components/MultiplayerResults';
+
 import "./assets/styles.css";
+
+function formatHMS(ms) {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+// Milliseconds until next 00:00 UTC (matches backend daily reset)
+function msUntilNextUtcMidnight() {
+  const now = new Date();
+  const nextUtcMidnight = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate() + 1,
+    0, 0, 0, 0
+  ));
+  return nextUtcMidnight - now;
+}
 
 function App() {
   const [currentView, setCurrentView] = useState('start');
   const [previousView, setPreviousView] = useState('start');
   const [showLoginModal, setShowLoginModal] = useState(false);
-  const [socket, setSocket] = useState(null);
   const [multiplayerRoom, setMultiplayerRoom] = useState(null);
   const [multiplayerResults, setMultiplayerResults] = useState(null);
   const [multiplayerMode, setMultiplayerMode] = useState(null);
 
+  // ✅ Countdown state for daily challenge
+  const [dailyRemainingMs, setDailyRemainingMs] = useState(msUntilNextUtcMidnight());
+  useEffect(() => {
+    const id = setInterval(() => setDailyRemainingMs(msUntilNextUtcMidnight()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  // ✅ Pull everything (including socket) from context
   const {
     startGame,
     startDailyChallenge,
     selectedDifficulty,
     setSelectedDifficulty,
     user,
-    logout
+    logout,
+    socket, // <-- use this instead of creating one here
   } = useContext(GameContext);
-
-  useEffect(() => {
-    const newSocket = io('http://localhost:3001');
-    setSocket(newSocket);
-    return () => newSocket.close();
-  }, []);
 
   const handleNavigate = (view) => {
     if (['leaderboard', 'howto'].includes(view)) setPreviousView(currentView);
@@ -72,7 +96,6 @@ function App() {
 
   const handleBackToMultiplayerLobby = () => {
     setMultiplayerResults(null);
-    // Do NOT clear multiplayerRoom here
     setCurrentView('multiplayer-lobby');
   };
 
@@ -105,10 +128,10 @@ function App() {
 
   return (
     <>
+      {/* Make sure starbackground.mp4 lives in /public */}
       <video src="/starbackground.mp4" muted loop autoPlay playsInline id="background-video" />
       <div id="blue-tint" />
       {showCircle && currentView !== 'multiplayer-game' && <LetterCircles />}
-
 
       <NavBar
         onShowLogin={() => setShowLoginModal(true)}
@@ -122,11 +145,20 @@ function App() {
           <div className="dashboard-container">
             <div className="sidebar left">
               <div className="card">
-                <h2>🌍 Daily Challenge</h2>
-                <p>Same challenge for everyone!</p>
-                <button id="daily-button" onClick={handleDailyChallengeStart} className="big-play-button">Play</button>
+                <h2 className="text-xl font-bold mb-2">🌍 Daily Challenge</h2>
+                <button
+                  id="daily-button"
+                  className="big-play-button w-full mb-4"
+                  onClick={handleDailyChallengeStart}
+                >
+                  Play
+                </button>
+                <div className="mt-1 text-sm text-white/90">
+                  <div className="font-semibold">
+                    Next Daily Challenge in: {formatHMS(dailyRemainingMs)}
+                  </div>
+                </div>
               </div>
-
               <div className="card">
                 <h2>👥 Multiplayer</h2>
                 <p>Challenge your friends!</p>
@@ -186,6 +218,7 @@ function App() {
         {currentView === 'game' && (
           <Game onEndGame={() => setCurrentView('summary')} />
         )}
+
         {currentView === 'multiplayer-game' && (
           <MultiplayerGame
             socket={socket}
@@ -193,9 +226,11 @@ function App() {
             onGameEnd={handleMultiplayerGameEnd}
           />
         )}
+
         {currentView === 'summary' && (
           <Summary user={user} onShowLogin={() => setShowLoginModal(true)} />
         )}
+
         {currentView === 'multiplayer-lobby' && (
           <MultiplayerLobby
             socket={socket}
@@ -215,6 +250,7 @@ function App() {
             roomCode={multiplayerRoom?.code}
           />
         )}
+
         {currentView === 'leaderboard' && <Leaderboard onBack={handleBack} />}
         {currentView === 'howto' && <HowToPlay onBack={handleBack} />}
       </div>

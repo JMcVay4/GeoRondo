@@ -16,11 +16,12 @@ Add more questions
 Multiplayer mode
 Once a whole circle is completed it gets harder
 Other gamemodes
+
 Frontend
-
-React (Vite)
+React.js
 Tailwind CSS
-Backend
 
+Backend
+WebSockets
 Node.js + Express
 Prisma ORM + PostgreSQL

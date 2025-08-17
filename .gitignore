@@ -6,7 +6,11 @@
 **/.vite
 
 # Ignore environment variable files
-**/.env
+.env
+.env.local
+.env.development
+.env.production
+.env.staging
 
 # Ignore macOS junk
 .DS_Store

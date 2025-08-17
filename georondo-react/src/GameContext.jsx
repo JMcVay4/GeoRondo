@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import io from 'socket.io-client';
 import questionBank from './questions';
+import config from './config/environment.js';
 
 export const GameContext = createContext();
 
@@ -12,11 +13,22 @@ export const useGame = () => {
   return context;
 };
 
+// ==== Daily helpers (UTC so everyone shares the same "day") ====
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const DAILY_EPOCH = { y: 2025, m: 0, d: 1 }; // 2025-01-01 (UTC)
+
+function getUtcDayIndex(date = new Date()) {
+  const todayUTC = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+  const epochUTC = Date.UTC(DAILY_EPOCH.y, DAILY_EPOCH.m, DAILY_EPOCH.d);
+  return Math.floor((todayUTC - epochUTC) / MS_PER_DAY);
+}
+
 export const GameProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [socket, setSocket] = useState(null);
   const [currentView, setCurrentView] = useState('start');
   const [selectedDifficulty, setSelectedDifficulty] = useState('easy');
+
   const [alphabet] = useState('ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''));
   const [currentLetterIndex, setCurrentLetterIndex] = useState(0);
   const [playerAnswers, setPlayerAnswers] = useState([]);
@@ -32,8 +44,11 @@ export const GameProvider = ({ children }) => {
   const [multiplayerMode, setMultiplayerMode] = useState(null);
   const [gameOverData, setGameOverData] = useState(null);
 
+  // Daily mode seed: null = not in daily mode
+  const [dailySeed, setDailySeed] = useState(null);
+
   useEffect(() => {
-    const newSocket = io('http://localhost:3001');
+    const newSocket = io(config.SOCKET_URL);
     setSocket(newSocket);
     return () => newSocket.close();
   }, []);
@@ -70,27 +85,22 @@ export const GameProvider = ({ children }) => {
 
   const handleGoogleSignIn = async (response) => {
     try {
-      const res = await fetch('http://localhost:3001/auth/google', {
+      const res = await fetch(`${config.API_URL}/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: response.credential }),
       });
       if (res.ok) {
         const data = await res.json();
-        console.log('Google sign-in response:', data); // Debug log
-        
-        // Store the full user object including the database ID
         const userObject = {
-          id: data.user.id, // Database ID for score submission
+          id: data.user.id, // DB ID for score submission
           username: data.user.name || data.user.email || 'GoogleUser',
           email: data.user.email,
           name: data.user.name,
           picture: data.user.picture
         };
-        
         setUser(userObject);
         localStorage.setItem('user', JSON.stringify(userObject));
-        console.log('User stored:', userObject); // Debug log
       } else {
         console.error('Google sign-in failed');
       }
@@ -104,11 +114,8 @@ export const GameProvider = ({ children }) => {
       console.log('No user or user ID for score submission');
       return;
     }
-
-    console.log('Submitting score:', { score, timeUsed, difficulty, userId: user.id }); // Debug log
-
     try {
-      const response = await fetch('http://localhost:3001/submit', {
+      const response = await fetch(`${config.API_URL}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -132,7 +139,9 @@ export const GameProvider = ({ children }) => {
     }
   };
 
+  // ============ Game setup (normal) ============
   const startGame = () => {
+    setDailySeed(null); // ensure normal mode
     setCurrentView('game');
     setGameActive(true);
     setCurrentLetterIndex(0);
@@ -146,6 +155,27 @@ export const GameProvider = ({ children }) => {
     setCurrentQuestion(getQuestionForLetter(alphabet[0]));
   };
 
+  // ============ Game setup (daily deterministic) ============
+  const startDailyChallenge = () => {
+    const seed = getUtcDayIndex();          // today's deterministic seed
+    setSelectedDifficulty('daily');         // backend maps to daily-YYYY-MM-DD
+    setDailySeed(seed);
+
+    setCurrentView('game');
+    setGameActive(true);
+    setCurrentLetterIndex(0);
+    setPlayerAnswers([]);
+    setSkipsRemaining(3);
+    setTotalTime(150);
+    setSkippedLetters([]);
+    setSavedSkippedQuestions([]);
+    setSkipMode(false);
+    setGameOverData(null);
+
+    setCurrentQuestion(getDailyQuestionForLetter(alphabet[0], seed));
+  };
+
+  // ============ Answering / Progression ============
   const handleSubmit = (answer) => {
     if (!gameActive || !currentQuestion) return;
 
@@ -200,7 +230,11 @@ export const GameProvider = ({ children }) => {
     if (!skipMode && nextIndex < alphabet.length) {
       // Regular progression
       setCurrentLetterIndex(nextIndex);
-      setCurrentQuestion(getQuestionForLetter(alphabet[nextIndex]));
+      if (selectedDifficulty === 'daily' && dailySeed !== null) {
+        setCurrentQuestion(getDailyQuestionForLetter(alphabet[nextIndex], dailySeed));
+      } else {
+        setCurrentQuestion(getQuestionForLetter(alphabet[nextIndex]));
+      }
     } else if (!skipMode && nextIndex >= alphabet.length && skippedLetters.length > 0) {
       // Entering skip mode after Z
       setSkipMode(true);
@@ -224,6 +258,7 @@ export const GameProvider = ({ children }) => {
     }
   };
 
+  // ============ Question selection ============
   const getQuestionForLetter = (letter) => {
     const pool = questionBank[letter]?.filter(q => q.difficulty === selectedDifficulty);
     if (!pool || pool.length === 0) return null;
@@ -231,24 +266,33 @@ export const GameProvider = ({ children }) => {
     return pool[randomIndex];
   };
 
+  function getDailyQuestionForLetter(letter, seed) {
+    const all = questionBank[letter] || [];
+    if (all.length === 0) {
+      return {
+        question: `Name a place that starts with "${letter}"`,
+        correctAnswers: ['Any answer'],
+        difficulty: 'daily'
+      };
+    }
+    // Deterministic index for the day (same for everyone)
+    const idx = ((seed % all.length) + all.length) % all.length;
+    return all[idx];
+  }
+
+  // ============ End game / submit ============
   const endGame = () => {
     setGameActive(false);
-    
+
     // Calculate game stats
     const totalTimeUsed = 150 - totalTime;
     const finalScore = playerAnswers.filter(answer => answer.wasCorrect).length;
-    
-    setGameOverData({
-      totalTimeUsed: totalTimeUsed
-    });
 
-    console.log('Game ended. Final score:', finalScore, 'Time used:', totalTimeUsed); // Debug log
+    setGameOverData({ totalTimeUsed });
 
     // Submit score to leaderboard if user is logged in
     if (user && user.id) {
       submitScore(finalScore, totalTimeUsed, selectedDifficulty);
-    } else {
-      console.log('User not logged in, not submitting score');
     }
   };
 
@@ -280,6 +324,7 @@ export const GameProvider = ({ children }) => {
     handleGoogleSignIn,
     logout,
     startGame,
+    startDailyChallenge, // <-- used by your Daily button
     handleSubmit,
     handleSkip,
     setNextQuestion,

@@ -1,201 +1,315 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useGame } from '../GameContext';
 import LetterCircles from './LetterCircles';
 
 function MultiplayerGame({ socket, room, onGameEnd }) {
   const { user } = useGame();
   const answerRef = useRef(null);
+  const gameInitialized = useRef(false);
   
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [currentQuestion, setCurrentQuestion] = useState(null);
-  const [currentLetter, setCurrentLetter] = useState('A');
-  const [timeLeft, setTimeLeft] = useState(150);
+  // Core game state
+  const [gameState, setGameState] = useState({
+    currentQuestionIndex: 0,
+    currentQuestion: null,
+    currentLetter: 'A',
+    timeLeft: 150,
+    gameActive: true,
+    skipsRemaining: 3,
+    skipMode: false
+  });
+  
+  // Game data
   const [playerScores, setPlayerScores] = useState({});
   const [playerAnswers, setPlayerAnswers] = useState([]);
-  const [gameActive, setGameActive] = useState(true);
-  const [skipsRemaining, setSkipsRemaining] = useState(3);
   const [currentAnswer, setCurrentAnswer] = useState('');
   const [finishedPlayers, setFinishedPlayers] = useState([]);
   const [skippedLetters, setSkippedLetters] = useState([]);
   const [savedSkippedQuestions, setSavedSkippedQuestions] = useState([]);
-  const [skipMode, setSkipMode] = useState(false);
 
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
+  // Initialize game only once
+  useEffect(() => {
+    if (!socket || !room || gameInitialized.current) return;
+
+    console.log('Initializing multiplayer game...', room);
+    
+    if (room.questions && room.questions.length > 0) {
+      setGameState(prev => ({
+        ...prev,
+        currentQuestion: room.questions[0],
+        currentLetter: alphabet[0],
+        currentQuestionIndex: 0
+      }));
+    }
+
+    // Initialize player scores
+    const scores = {};
+    if (room.players) {
+      room.players.forEach(player => {
+        scores[player.username] = 0;
+      });
+      setPlayerScores(scores);
+    }
+
+    gameInitialized.current = true;
+  }, [socket, room]);
+
+  // Socket event handlers
   useEffect(() => {
     if (!socket) return;
 
-    setCurrentQuestion(room.questions[0]);
-    setCurrentLetter(alphabet[0]);
-
-    const scores = {};
-    room.players.forEach(player => {
-      scores[player.username] = 0;
-    });
-    setPlayerScores(scores);
-
-    socket.on('player-answered', (data) => {
-      setPlayerScores(prev => {
-        const updated = { ...prev };
-        data.currentScores.forEach(s => {
-          updated[s.username] = s.score;
+    const handlePlayerAnswered = (data) => {
+      console.log('Player answered:', data);
+      if (data.currentScores) {
+        setPlayerScores(prev => {
+          const updated = { ...prev };
+          data.currentScores.forEach(s => {
+            updated[s.username] = s.score;
+          });
+          return updated;
         });
-        return updated;
-      });
-    });
+      }
+    };
 
-    socket.on('player-finished-update', (data) => {
-      setFinishedPlayers(data.finishedPlayers);
-    });
+    const handlePlayerFinished = (data) => {
+      console.log('Player finished:', data);
+      setFinishedPlayers(data.finishedPlayers || []);
+    };
 
-    socket.on('game-finished', (data) => {
+    const handleGameFinished = (data) => {
+      console.log('Game finished:', data);
+      setGameState(prev => ({ ...prev, gameActive: false }));
       onGameEnd(data.results);
-    });
+    };
+
+    socket.on('player-answered', handlePlayerAnswered);
+    socket.on('player-finished-update', handlePlayerFinished);
+    socket.on('game-finished', handleGameFinished);
 
     return () => {
-      socket.off('player-answered');
-      socket.off('player-finished-update');
-      socket.off('game-finished');
+      socket.off('player-answered', handlePlayerAnswered);
+      socket.off('player-finished-update', handlePlayerFinished);
+      socket.off('game-finished', handleGameFinished);
     };
-  }, [socket, room, onGameEnd]);
+  }, [socket, onGameEnd]);
 
+  // Timer effect
   useEffect(() => {
-    if (!gameActive) return;
+    if (!gameState.gameActive) return;
+    
     const timer = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) {
+      setGameState(prev => {
+        if (prev.timeLeft <= 1) {
           endGame();
-          return 0;
+          return { ...prev, timeLeft: 0, gameActive: false };
         }
-        return prev - 1;
+        return { ...prev, timeLeft: prev.timeLeft - 1 };
       });
     }, 1000);
+    
     return () => clearInterval(timer);
-  }, [gameActive]);
+  }, [gameState.gameActive]);
 
+  // Focus input when question changes
   useEffect(() => {
-    if (answerRef.current && gameActive) {
+    if (answerRef.current && gameState.gameActive) {
       answerRef.current.focus();
     }
-  }, [currentQuestionIndex, gameActive]);
+  }, [gameState.currentQuestionIndex, gameState.gameActive]);
 
   const formatTime = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
+  const moveToNextQuestion = useCallback(() => {
+    console.log('Moving to next question. Current state:', {
+      currentIndex: gameState.currentQuestionIndex,
+      skipMode: gameState.skipMode,
+      skippedLettersLength: skippedLetters.length
+    });
+
+    const nextIndex = gameState.currentQuestionIndex + 1;
+    
+    if (!gameState.skipMode && nextIndex < alphabet.length) {
+      // Regular progression through alphabet
+      const newQuestion = room.questions[nextIndex];
+      const newLetter = alphabet[nextIndex];
+      
+      console.log('Regular progression:', { nextIndex, newLetter, newQuestion: newQuestion?.question });
+      
+      setGameState(prev => ({
+        ...prev,
+        currentQuestionIndex: nextIndex,
+        currentLetter: newLetter,
+        currentQuestion: newQuestion
+      }));
+      
+    } else if (!gameState.skipMode && nextIndex >= alphabet.length && skippedLetters.length > 0) {
+      // Finished alphabet, now do skipped questions
+      const [firstSkipped, ...restSkipped] = skippedLetters;
+      const [firstQuestion, ...restQuestions] = savedSkippedQuestions;
+      
+      console.log('Entering skip mode:', { firstSkipped, firstQuestion: firstQuestion?.question });
+      
+      setGameState(prev => ({
+        ...prev,
+        skipMode: true,
+        currentQuestionIndex: firstSkipped,
+        currentQuestion: firstQuestion,
+        currentLetter: alphabet[firstSkipped]
+      }));
+      
+      setSkippedLetters(restSkipped);
+      setSavedSkippedQuestions(restQuestions);
+      
+    } else if (gameState.skipMode && skippedLetters.length > 0) {
+      // Continue with remaining skipped questions
+      const [nextSkipped, ...restSkipped] = skippedLetters;
+      const [nextQuestion, ...restQuestions] = savedSkippedQuestions;
+      
+      console.log('Continuing skip mode:', { nextSkipped, nextQuestion: nextQuestion?.question });
+      
+      setGameState(prev => ({
+        ...prev,
+        currentQuestionIndex: nextSkipped,
+        currentQuestion: nextQuestion,
+        currentLetter: alphabet[nextSkipped]
+      }));
+      
+      setSkippedLetters(restSkipped);
+      setSavedSkippedQuestions(restQuestions);
+      
+    } else {
+      // All questions completed
+      console.log('All questions completed, ending game');
+      endGame();
+    }
+  }, [gameState.currentQuestionIndex, gameState.skipMode, skippedLetters, savedSkippedQuestions, room.questions, alphabet]);
+
+  const checkIfFinalQuestion = useCallback(() => {
+    if (gameState.skipMode && skippedLetters.length === 0) {
+      return true;
+    }
+    if (!gameState.skipMode && gameState.currentQuestionIndex === alphabet.length - 1 && skippedLetters.length === 0) {
+      return true;
+    }
+    return false;
+  }, [gameState.skipMode, gameState.currentQuestionIndex, skippedLetters.length]);
+
   const submitAnswer = () => {
-    if (!gameActive) return;
+    if (!gameState.gameActive || !gameState.currentQuestion) return;
+    
     const answer = currentAnswer.trim();
     if (!answer) return;
 
-    if (answer.toUpperCase() === 'SKIP') {
+    console.log('Submitting answer:', answer, 'for letter:', gameState.currentLetter);
+
+    // Handle skip commands
+    if (['SKIP', 'PASS'].includes(answer.toUpperCase())) {
       handleSkip();
       return;
     }
 
-    const isCorrect = currentQuestion.correctAnswers.some(
+    // Check if answer is correct
+    const isCorrect = gameState.currentQuestion.correctAnswers.some(
       correct => correct.toLowerCase() === answer.toLowerCase()
     );
 
+    console.log('Answer is correct:', isCorrect);
+
+    // Create answer entry
     const newEntry = {
-      letter: currentLetter,
-      question: currentQuestion.question,
+      letter: gameState.currentLetter,
+      question: gameState.currentQuestion.question,
       userAnswer: answer,
       wasCorrect: isCorrect,
-      correctAnswers: currentQuestion.correctAnswers
+      correctAnswers: gameState.currentQuestion.correctAnswers
     };
 
-    // Check if this is the final question
-    const isFinalZ = !skipMode && currentQuestionIndex === alphabet.length - 1 && skippedLetters.length === 0;
-    const isFinalSkipped = skipMode && skippedLetters.length === 0;
+    // Update local state immediately
+    const updatedAnswers = [...playerAnswers, newEntry];
+    setPlayerAnswers(updatedAnswers);
 
-    setPlayerAnswers(prev => [...prev, newEntry]);
+    // Send answer to server
+    if (socket) {
+      socket.emit('submit-answer', {
+        roomCode: room.code,
+        answer,
+        questionIndex: gameState.currentQuestionIndex,
+        isCorrect
+      });
+    }
 
-    socket.emit('submit-answer', {
-      roomCode: room.code,
-      answer,
-      questionIndex: currentQuestionIndex
-    });
+    // Clear input
+    setCurrentAnswer('');
 
-    if (isFinalZ || isFinalSkipped) {
-      setTimeout(() => endGame([...playerAnswers, newEntry]), 0);
+    // Check if game should end
+    const isFinalQuestion = checkIfFinalQuestion();
+    console.log('Is final question:', isFinalQuestion);
+    
+    if (isFinalQuestion) {
+      setTimeout(() => endGame(updatedAnswers), 100);
     } else {
-      setCurrentAnswer('');
       moveToNextQuestion();
     }
   };
 
   const handleSkip = () => {
-    if (!gameActive || skipsRemaining <= 0) return;
+    if (!gameState.gameActive || gameState.skipsRemaining <= 0 || !gameState.currentQuestion) return;
     
+    console.log('Skipping question for letter:', gameState.currentLetter);
+    
+    // Create skip entry
     const newEntry = {
-      letter: currentLetter,
-      question: currentQuestion.question,
+      letter: gameState.currentLetter,
+      question: gameState.currentQuestion.question,
       userAnswer: '',
       wasCorrect: false,
-      correctAnswers: currentQuestion.correctAnswers
+      correctAnswers: gameState.currentQuestion.correctAnswers
     };
 
+    // Update state
     setPlayerAnswers(prev => [...prev, newEntry]);
-    setSkippedLetters(prev => [...prev, currentQuestionIndex]);
-    setSavedSkippedQuestions(prev => [...prev, currentQuestion]);
-    setSkipsRemaining(prev => prev - 1);
+    setSkippedLetters(prev => [...prev, gameState.currentQuestionIndex]);
+    setSavedSkippedQuestions(prev => [...prev, gameState.currentQuestion]);
+    setGameState(prev => ({ ...prev, skipsRemaining: prev.skipsRemaining - 1 }));
     setCurrentAnswer('');
+
+    // Move to next question
     moveToNextQuestion();
   };
 
-  const moveToNextQuestion = () => {
-    const nextIndex = currentQuestionIndex + 1;
+  const endGame = (answersOverride = null) => {
+    if (!gameState.gameActive) return;
     
-    if (!skipMode && nextIndex < alphabet.length) {
-      // Regular progression through alphabet
-      setCurrentQuestionIndex(nextIndex);
-      setCurrentQuestion(room.questions[nextIndex]);
-      setCurrentLetter(alphabet[nextIndex]);
-    } else if (!skipMode && nextIndex >= alphabet.length && skippedLetters.length > 0) {
-      // Finished alphabet, now do skipped questions
-      setSkipMode(true);
-      const [firstSkipped, ...restSkipped] = skippedLetters;
-      const [firstQuestion, ...restQuestions] = savedSkippedQuestions;
-      setCurrentQuestionIndex(firstSkipped);
-      setCurrentQuestion(firstQuestion);
-      setCurrentLetter(alphabet[firstSkipped]);
-      setSkippedLetters(restSkipped);
-      setSavedSkippedQuestions(restQuestions);
-    } else if (skipMode && skippedLetters.length > 0) {
-      // Continue with remaining skipped questions
-      const [nextSkipped, ...restSkipped] = skippedLetters;
-      const [nextQuestion, ...restQuestions] = savedSkippedQuestions;
-      setCurrentQuestionIndex(nextSkipped);
-      setCurrentQuestion(nextQuestion);
-      setCurrentLetter(alphabet[nextSkipped]);
-      setSkippedLetters(restSkipped);
-      setSavedSkippedQuestions(restQuestions);
-    } else {
-      // All questions completed
-      endGame();
+    console.log('Ending game');
+    setGameState(prev => ({ ...prev, gameActive: false }));
+    
+    const answersToSend = answersOverride || playerAnswers;
+    const finalScore = answersToSend.filter(a => a.wasCorrect).length;
+    const timeUsed = 150 - gameState.timeLeft;
+    
+    if (socket) {
+      socket.emit('player-finished', {
+        roomCode: room.code,
+        finalScore,
+        timeUsed,
+        answers: answersToSend
+      });
     }
   };
 
-  const endGame = (answersOverride) => {
-    setGameActive(false);
-    const answersToSend = answersOverride || playerAnswers;
-    const finalScore = answersToSend.filter(a => a.wasCorrect).length;
-    const timeUsed = 150 - timeLeft;
-    socket.emit('player-finished', {
-      roomCode: room.code,
-      finalScore,
-      timeUsed,
-      answers: answersToSend
-    });
-  };
-
-  if (!gameActive) {
+  // Game finished screen
+  if (!gameState.gameActive) {
+    const finalScore = playerAnswers.filter(a => a.wasCorrect).length;
+    const timeUsed = 150 - gameState.timeLeft;
+    
     return (
       <div className="flex flex-col items-center p-8 text-white">
         <h2 className="text-4xl font-bold mb-6">Game Finished!</h2>
         <div className="text-xl mb-4">Waiting for other players to finish...</div>
         <div className="mb-4">
-          <p>Your Score: {playerAnswers.filter(a => a.wasCorrect).length}/26</p>
-          <p>Time Used: {formatTime(150 - timeLeft)}</p>
+          <p>Your Score: {finalScore}/26</p>
+          <p>Time Used: {formatTime(timeUsed)}</p>
         </div>
         {finishedPlayers.length > 0 && (
           <div className="mb-4">
@@ -213,35 +327,46 @@ function MultiplayerGame({ socket, room, onGameEnd }) {
 
   return (
     <>
+      {/* Live Scores Panel */}
       <div className="absolute top-28 left-4 bg-black/50 p-4 rounded-lg text-white z-10">
         <h3 className="font-bold mb-2">Live Scores</h3>
         {Object.entries(playerScores)
           .sort(([, a], [, b]) => b - a)
           .map(([username, score], index) => (
-            <div key={username} className={`flex justify-between mb-1 ${username === user?.username ? 'text-yellow-400 font-bold' : ''}`}>
+            <div 
+              key={username} 
+              className={`flex justify-between mb-1 ${
+                username === user?.username ? 'text-yellow-400 font-bold' : ''
+              }`}
+            >
               <span>{index + 1}. {username}</span>
               <span>{score}</span>
             </div>
           ))}
       </div>
 
+
+
+      {/* Game Interface */}
       <div className="game-container">
         <LetterCircles 
-          customCurrentLetterIndex={currentQuestionIndex}
+          customCurrentLetterIndex={gameState.currentQuestionIndex}
           customPlayerAnswers={playerAnswers}
           customAlphabet={alphabet}
           customSkippedLetters={skippedLetters}
-          customSkipMode={skipMode}
+          customSkipMode={gameState.skipMode}
         />
 
         <div className="center-content">
           <div className="stats">
-            <div className="timer">Time: {formatTime(timeLeft)}</div>
-            <div className="skips">Skips: {skipsRemaining} remaining</div>
+            <div className="timer">Time: {formatTime(gameState.timeLeft)}</div>
+            <div className="skips">Skips: {gameState.skipsRemaining} remaining</div>
           </div>
 
           <div className="question-container">
-            <div className="question">{currentQuestion?.question || '...'}</div>
+            <div className="question">
+              {gameState.currentQuestion?.question || 'Loading question...'}
+            </div>
             <input
               type="text"
               id="answer-input"
@@ -249,15 +374,19 @@ function MultiplayerGame({ socket, room, onGameEnd }) {
               value={currentAnswer}
               onChange={(e) => setCurrentAnswer(e.target.value)}
               placeholder="Type your answer here"
-              disabled={!gameActive}
+              disabled={!gameState.gameActive}
               onKeyDown={(e) => e.key === 'Enter' && submitAnswer()}
               className="text-white"
             />
           </div>
 
           <div className="button-container">
-            <button id="skip-button" onClick={handleSkip} disabled={!gameActive || skipsRemaining <= 0}>
-              Skip ({skipsRemaining} left)
+            <button 
+              id="skip-button" 
+              onClick={handleSkip} 
+              disabled={!gameState.gameActive || gameState.skipsRemaining <= 0}
+            >
+              Skip ({gameState.skipsRemaining} left)
             </button>
           </div>
         </div>

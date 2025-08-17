@@ -9,14 +9,12 @@ function MultiplayerLobby({ socket, onBack, onStartMultiplayerGame, mode, room: 
   const [error, setError] = useState('');
   const [isHost, setIsHost] = useState(false);
 
-  // Initialize selectedDifficulty with room difficulty when room is available
   useEffect(() => {
     if (room?.difficulty && selectedDifficulty !== room.difficulty) {
       setSelectedDifficulty(room.difficulty);
     }
   }, [room?.difficulty, selectedDifficulty, setSelectedDifficulty]);
 
-  // Set isHost based on room data when room is available
   useEffect(() => {
     if (room && user?.username) {
       setIsHost(room.host === user.username);

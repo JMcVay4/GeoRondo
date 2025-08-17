@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import config from '../config/environment.js';
 
 const LeaderboardTable = ({ title, data }) => (
   <div className="difficulty-board">
@@ -55,7 +56,7 @@ export default function Leaderboard({ onBack }) {
       for (const diff of difficulties) {
         try {
           console.log(`Fetching ${diff} leaderboard...`);
-          const res = await fetch(`http://localhost:3001/leaderboard?difficulty=${diff}`);
+          const res = await fetch(`${config.API_URL}/leaderboard?difficulty=${diff}`);
           console.log(`${diff} response status:`, res.status);
           
           if (res.ok) {
