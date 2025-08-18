@@ -1,3 +1,4 @@
+// import { execSync } from "child_process";
 const express = require('express');
 const cors = require('cors');
 const { PrismaClient } = require('@prisma/client');
@@ -6,31 +7,42 @@ const { Server } = require('socket.io');
 const http = require('http');
 require('dotenv').config();
 
+// async function main() {
+//   try {
+//     console.log("Running Prisma migrations...");
+//     execSync("npx prisma migrate deploy", { stdio: "inherit" });
+//   } catch (err) {
+//     console.error("Migration failed:", err);
+//   }
+
+//   // then start your server normally
+//   app.listen(PORT, () => {
+//     console.log(`Server running on port ${PORT}`);
+//   });
+// }
+
+// main();
 // Import questions from frontend
 const questionBank = require('./questions');
 
 const app = express();
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('Allowed origins:', getAllowedOrigins());
 const server = http.createServer(app);
 
 // Define getAllowedOrigins function FIRST
 const getAllowedOrigins = () => {
   if (process.env.NODE_ENV === 'production') {
-    return [
-      process.env.FRONTEND_URL || 'https://georondo.com',
-      'https://www.georondo.com'
-    ];
-  } else {
-    return [
-      'http://localhost:5173', 
-      'http://localhost:5174'
-    ];
+    const list = process.env.FRONTEND_URL || 'https://georondo.com,https://www.georondo.com';
+    return list.split(',').map(s => s.trim());
   }
+  return ['http://localhost:5173', 'http://localhost:5174'];
 };
-
+const allowedOrigins = getAllowedOrigins();
 // NOW use the function in Socket.io setup
 const io = new Server(server, {
   cors: {
-    origin: getAllowedOrigins(),
+    origin: allowedOrigins,
     methods: ['GET', 'POST'],
     credentials: true
   }
@@ -44,7 +56,7 @@ const rooms = new Map();
 
 // Use the function in Express CORS setup too
 app.use(cors({
-  origin: getAllowedOrigins(),
+  origin: allowedOrigins,
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
