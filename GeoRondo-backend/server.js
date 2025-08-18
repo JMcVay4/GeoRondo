@@ -9,8 +9,8 @@ const { Server } = require('socket.io');
 const http = require('http');
 require('dotenv').config();
 
-// Import questions from frontend
-const questionBank = require('./questions');
+const rawQuestions = require('./questions');
+const questionBank = rawQuestions.default || rawQuestions;
 
 const app = express();
 const server = http.createServer(app);
