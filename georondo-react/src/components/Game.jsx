@@ -44,12 +44,12 @@ function Game({ onEndGame }) {
     }
   }, [currentLetterIndex, currentQuestion]);
 
+  // When gameActive flips false (context sets it), tell parent to show summary
   useEffect(() => {
-  // Game ends when gameActive becomes false
-  if (!gameActive) {
-    onEndGame(playerAnswers);
-  }
-}, [gameActive, playerAnswers, onEndGame]);
+    if (!gameActive) {
+      onEndGame(playerAnswers);
+    }
+  }, [gameActive, playerAnswers, onEndGame]);
 
   return (
     <div id="game-ui">

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import io from 'socket.io-client';
 import questionBank from './questions';
 import config from './config/environment.js';
@@ -13,7 +13,7 @@ export const useGame = () => {
   return context;
 };
 
-// ==== Daily helpers (UTC so everyone shares the same "day") ====
+// ==== Daily helpers (UTC) ====
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const DAILY_EPOCH = { y: 2025, m: 0, d: 1 }; // 2025-01-01 (UTC)
 
@@ -22,6 +22,14 @@ function getUtcDayIndex(date = new Date()) {
   const epochUTC = Date.UTC(DAILY_EPOCH.y, DAILY_EPOCH.m, DAILY_EPOCH.d);
   return Math.floor((todayUTC - epochUTC) / MS_PER_DAY);
 }
+function todayUtcYmd() {
+  const now = new Date();
+  const y = now.getUTCFullYear();
+  const m = String(now.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(now.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+const DAILY_PLAY_KEY = (ymd) => `georondo_daily_${ymd}`;
 
 export const GameProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -36,23 +44,33 @@ export const GameProvider = ({ children }) => {
   const [totalTime, setTotalTime] = useState(0);
   const [gameActive, setGameActive] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState(null);
-  const [skippedLetters, setSkippedLetters] = useState([]);
-  const [savedSkippedQuestions, setSavedSkippedQuestions] = useState([]);
+
+  // === Skip queue (state + refs to avoid stale reads) ===
+  const [skippedLetters, setSkippedLetters] = useState([]);              // indices (FIFO)
+  const [savedSkippedQuestions, setSavedSkippedQuestions] = useState([]); // questions (FIFO)
+  const skippedLettersRef = useRef([]);            // mirrors state, always freshest
+  const savedSkippedQuestionsRef = useRef([]);     // mirrors state, always freshest
+
   const [skipMode, setSkipMode] = useState(false);
   const [multiplayerRoom, setMultiplayerRoom] = useState(null);
   const [multiplayerResults, setMultiplayerResults] = useState(null);
   const [multiplayerMode, setMultiplayerMode] = useState(null);
   const [gameOverData, setGameOverData] = useState(null);
 
-  // Daily mode seed: null = not in daily mode
   const [dailySeed, setDailySeed] = useState(null);
 
+  // keep refs mirrored to state
+  useEffect(() => { skippedLettersRef.current = skippedLetters; }, [skippedLetters]);
+  useEffect(() => { savedSkippedQuestionsRef.current = savedSkippedQuestions; }, [savedSkippedQuestions]);
+
+  // socket
   useEffect(() => {
     const newSocket = io(config.SOCKET_URL);
     setSocket(newSocket);
     return () => newSocket.close();
   }, []);
 
+  // timer
   useEffect(() => {
     let timer;
     if (gameActive && totalTime > 0) {
@@ -70,6 +88,7 @@ export const GameProvider = ({ children }) => {
     return () => clearInterval(timer);
   }, [gameActive, totalTime]);
 
+  // restore user
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
     if (savedUser) {
@@ -88,12 +107,12 @@ export const GameProvider = ({ children }) => {
       const res = await fetch(`${config.API_URL}/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: response.credential }),
+        body: JSON.stringify({ token: response.credential } ),
       });
       if (res.ok) {
         const data = await res.json();
         const userObject = {
-          id: data.user.id, // DB ID for score submission
+          id: data.user.id,
           username: data.user.name || data.user.email || 'GoogleUser',
           email: data.user.email,
           name: data.user.name,
@@ -118,47 +137,48 @@ export const GameProvider = ({ children }) => {
       const response = await fetch(`${config.API_URL}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          score,
-          time: timeUsed,
-          difficulty,
-          userId: user.id
-        })
+        body: JSON.stringify({ score, time: timeUsed, difficulty, userId: user.id })
       });
-
-      if (response.ok) {
-        const result = await response.json();
-        console.log('Score submission result:', result);
-      } else {
+      if (!response.ok) {
         console.error('Score submission failed:', response.status);
-        const errorText = await response.text();
-        console.error('Error response:', errorText);
       }
     } catch (error) {
       console.error('Score submission error:', error);
     }
   };
 
-  // ============ Game setup (normal) ============
+  // ---- Normal single-player
   const startGame = () => {
-    setDailySeed(null); // ensure normal mode
+    setDailySeed(null);
     setCurrentView('game');
     setGameActive(true);
     setCurrentLetterIndex(0);
     setPlayerAnswers([]);
     setSkipsRemaining(3);
     setTotalTime(150);
+
+    // reset skip queue (state + refs)
     setSkippedLetters([]);
     setSavedSkippedQuestions([]);
+    skippedLettersRef.current = [];
+    savedSkippedQuestionsRef.current = [];
+
     setSkipMode(false);
     setGameOverData(null);
     setCurrentQuestion(getQuestionForLetter(alphabet[0]));
   };
 
-  // ============ Game setup (daily deterministic) ============
+  // ---- Daily (deterministic, once per UTC day)
   const startDailyChallenge = () => {
-    const seed = getUtcDayIndex();          // today's deterministic seed
-    setSelectedDifficulty('daily');         // backend maps to daily-YYYY-MM-DD
+    const today = todayUtcYmd();
+    const key = DAILY_PLAY_KEY(today);
+    if (localStorage.getItem(key) === 'played') {
+      window.alert('You’ve already played today’s Daily Challenge. Come back after UTC midnight!');
+      setCurrentView('start');
+      return;
+    }
+    const seed = getUtcDayIndex();
+    setSelectedDifficulty('daily');
     setDailySeed(seed);
 
     setCurrentView('game');
@@ -167,15 +187,19 @@ export const GameProvider = ({ children }) => {
     setPlayerAnswers([]);
     setSkipsRemaining(3);
     setTotalTime(150);
+
+    // reset skip queue (state + refs)
     setSkippedLetters([]);
     setSavedSkippedQuestions([]);
+    skippedLettersRef.current = [];
+    savedSkippedQuestionsRef.current = [];
+
     setSkipMode(false);
     setGameOverData(null);
-
     setCurrentQuestion(getDailyQuestionForLetter(alphabet[0], seed));
   };
 
-  // ============ Answering / Progression ============
+  // ---- Submit / Skip (replace per-letter record)
   const handleSubmit = (answer) => {
     if (!gameActive || !currentQuestion) return;
 
@@ -191,13 +215,25 @@ export const GameProvider = ({ children }) => {
       correctAnswers: currentQuestion.correctAnswers
     };
 
-    const isFinalZ = !skipMode && currentLetterIndex === alphabet.length - 1 && skippedLetters.length === 0;
-    const isFinalSkipped = skipMode && skippedLetters.length === 0;
+    // replace any existing record for this letter
+    setPlayerAnswers(prev => {
+      const filtered = prev.filter(a => a.letter !== alphabet[currentLetterIndex]);
+      return [...filtered, newEntry];
+    });
 
-    setPlayerAnswers(prev => [...prev, newEntry]);
+    // Are we on the last letter to be answered?
+    const isFinalZ =
+      !skipMode &&
+      currentLetterIndex === alphabet.length - 1 &&
+      skippedLettersRef.current.length === 0;
+
+    const isFinalSkipped =
+      skipMode &&
+      skippedLettersRef.current.length === 0;
 
     if (isFinalZ || isFinalSkipped) {
-      setTimeout(() => endGame(), 0);
+      // let the circle paint its final color before summary
+      setTimeout(() => endGame(), 180);
     } else {
       setNextQuestion();
     }
@@ -206,59 +242,99 @@ export const GameProvider = ({ children }) => {
   const handleSkip = () => {
     if (!gameActive || skipsRemaining <= 0) return;
 
-    setPlayerAnswers(prev => [
-      ...prev,
-      {
-        letter: alphabet[currentLetterIndex],
-        question: currentQuestion.question,
-        userAnswer: '',
-        wasCorrect: false,
-        correctAnswers: currentQuestion.correctAnswers
-      }
-    ]);
+    // record a "skip" answer for this letter
+    const skipEntry = {
+      letter: alphabet[currentLetterIndex],
+      question: currentQuestion.question,
+      userAnswer: '',
+      wasCorrect: false,
+      correctAnswers: currentQuestion.correctAnswers
+    };
 
-    setSkippedLetters(prev => [...prev, currentLetterIndex]);
-    setSavedSkippedQuestions(prev => [...prev, currentQuestion]);
+    setPlayerAnswers(prev => {
+      const filtered = prev.filter(a => a.letter !== alphabet[currentLetterIndex]);
+      return [...filtered, skipEntry];
+    });
+
+    // push onto FIFO queue using refs to avoid races
+    const nextLetters = [...skippedLettersRef.current, currentLetterIndex];
+    const nextQuestions = [...savedSkippedQuestionsRef.current, currentQuestion];
+
+    skippedLettersRef.current = nextLetters;
+    savedSkippedQuestionsRef.current = nextQuestions;
+
+    setSkippedLetters(nextLetters);
+    setSavedSkippedQuestions(nextQuestions);
+
     setSkipsRemaining(prev => prev - 1);
-
     setNextQuestion();
   };
 
+  // ---- Progression (supports skip-mode) — uses REF queues to avoid stale state
   const setNextQuestion = () => {
     const nextIndex = currentLetterIndex + 1;
 
+    // 1) Regular progression A..Z
     if (!skipMode && nextIndex < alphabet.length) {
-      // Regular progression
       setCurrentLetterIndex(nextIndex);
       if (selectedDifficulty === 'daily' && dailySeed !== null) {
         setCurrentQuestion(getDailyQuestionForLetter(alphabet[nextIndex], dailySeed));
       } else {
         setCurrentQuestion(getQuestionForLetter(alphabet[nextIndex]));
       }
-    } else if (!skipMode && nextIndex >= alphabet.length && skippedLetters.length > 0) {
-      // Entering skip mode after Z
-      setSkipMode(true);
-      const [firstSkipped, ...restSkipped] = skippedLetters;
-      const [firstQuestion, ...restQuestions] = savedSkippedQuestions;
-      setCurrentLetterIndex(firstSkipped);
-      setCurrentQuestion(firstQuestion);
-      setSkippedLetters(restSkipped);
-      setSavedSkippedQuestions(restQuestions);
-    } else if (skipMode && skippedLetters.length > 0) {
-      // Continue skipped questions
-      const [nextSkipped, ...restSkipped] = skippedLetters;
-      const [nextQuestion, ...restQuestions] = savedSkippedQuestions;
-      setCurrentLetterIndex(nextSkipped);
-      setCurrentQuestion(nextQuestion);
-      setSkippedLetters(restSkipped);
-      setSavedSkippedQuestions(restQuestions);
-    } else {
-      // All questions completed, including skips
+      return;
+    }
+
+    // 2) End of alphabet: enter skip mode if any were skipped
+    if (!skipMode && nextIndex >= alphabet.length) {
+      const sk = skippedLettersRef.current;
+      const sq = savedSkippedQuestionsRef.current;
+      if (sk.length > 0) {
+        const firstSkipped = sk[0];
+        const firstQuestion = sq[0];
+        const restSkipped = sk.slice(1);
+        const restQuestions = sq.slice(1);
+
+        // update queues (refs + state) BEFORE switching
+        skippedLettersRef.current = restSkipped;
+        savedSkippedQuestionsRef.current = restQuestions;
+        setSkippedLetters(restSkipped);
+        setSavedSkippedQuestions(restQuestions);
+
+        setSkipMode(true);
+        setCurrentLetterIndex(firstSkipped);
+        setCurrentQuestion(firstQuestion);
+        return;
+      }
       endGame();
+      return;
+    }
+
+    // 3) Continue skip mode (FIFO)
+    if (skipMode) {
+      const sk = skippedLettersRef.current;
+      const sq = savedSkippedQuestionsRef.current;
+      if (sk.length > 0) {
+        const nextSkipped = sk[0];
+        const nextQuestion = sq[0];
+        const restSkipped = sk.slice(1);
+        const restQuestions = sq.slice(1);
+
+        skippedLettersRef.current = restSkipped;
+        savedSkippedQuestionsRef.current = restQuestions;
+        setSkippedLetters(restSkipped);
+        setSavedSkippedQuestions(restQuestions);
+
+        setCurrentLetterIndex(nextSkipped);
+        setCurrentQuestion(nextQuestion);
+        return;
+      }
+      endGame();
+      return;
     }
   };
 
-  // ============ Question selection ============
+  // ---- Question selection
   const getQuestionForLetter = (letter) => {
     const pool = questionBank[letter]?.filter(q => q.difficulty === selectedDifficulty);
     if (!pool || pool.length === 0) return null;
@@ -275,22 +351,26 @@ export const GameProvider = ({ children }) => {
         difficulty: 'daily'
       };
     }
-    // Deterministic index for the day (same for everyone)
     const idx = ((seed % all.length) + all.length) % all.length;
     return all[idx];
   }
 
-  // ============ End game / submit ============
+  // ---- End game
   const endGame = () => {
     setGameActive(false);
 
-    // Calculate game stats
     const totalTimeUsed = 150 - totalTime;
     const finalScore = playerAnswers.filter(answer => answer.wasCorrect).length;
 
     setGameOverData({ totalTimeUsed });
 
-    // Submit score to leaderboard if user is logged in
+    // daily lock: mark played
+    if (selectedDifficulty === 'daily') {
+      try {
+        localStorage.setItem(DAILY_PLAY_KEY(todayUtcYmd()), 'played');
+      } catch {}
+    }
+
     if (user && user.id) {
       submitScore(finalScore, totalTimeUsed, selectedDifficulty);
     }
@@ -324,7 +404,7 @@ export const GameProvider = ({ children }) => {
     handleGoogleSignIn,
     logout,
     startGame,
-    startDailyChallenge, // <-- used by your Daily button
+    startDailyChallenge,
     handleSubmit,
     handleSkip,
     setNextQuestion,

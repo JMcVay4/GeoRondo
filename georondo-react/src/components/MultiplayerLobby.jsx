@@ -3,83 +3,132 @@ import { useGame } from '../GameContext';
 
 function MultiplayerLobby({ socket, onBack, onStartMultiplayerGame, mode, room: roomProp }) {
   const { user, selectedDifficulty, setSelectedDifficulty } = useGame();
+
   const [roomCode, setRoomCode] = useState(roomProp?.code || '');
-  const [joinCode, setJoinCode] = useState('');
   const [room, setRoom] = useState(roomProp || null);
+  const [joinCode, setJoinCode] = useState('');
   const [error, setError] = useState('');
   const [isHost, setIsHost] = useState(false);
 
+  // Sync local room/code with prop (when returning from Results)
+  useEffect(() => {
+    if (roomProp) {
+      setRoom(roomProp);
+      if (roomProp.code) setRoomCode(roomProp.code);
+    }
+  }, [roomProp]);
+
+  // Mirror difficulty from server
   useEffect(() => {
     if (room?.difficulty && selectedDifficulty !== room.difficulty) {
       setSelectedDifficulty(room.difficulty);
     }
   }, [room?.difficulty, selectedDifficulty, setSelectedDifficulty]);
 
+  // Determine host
   useEffect(() => {
     if (room && user?.username) {
       setIsHost(room.host === user.username);
+    } else {
+      setIsHost(false);
     }
   }, [room, user?.username]);
 
+  // Socket listeners
   useEffect(() => {
     if (!socket) return;
 
-    socket.on('room-created', (data) => {
+    const onRoomCreated = (data) => {
       setRoom(data.room);
-      setRoomCode(data.roomCode);
+      setRoomCode(data.room?.code || data.roomCode || '');
       setIsHost(true);
       setError('');
-    });
-
-    socket.on('player-joined', (data) => setRoom(data.room));
-    socket.on('room-updated', (data) => setRoom(data.room));
-    socket.on('player-left', (data) => setRoom(data.room));
-    socket.on('room-error', (data) => setError(data.message));
-    socket.on('game-started', (data) => {
+    };
+    const onPlayerJoined = (data) => {
+      setRoom(data.room);
+      if (data.room?.code) setRoomCode(data.room.code);
+    };
+    const onRoomUpdated = (data) => {
+      setRoom(data.room);
+      if (data.room?.code) setRoomCode(data.room.code);
+    };
+    const onPlayerLeft = (data) => {
+      setRoom(data.room);
+      if (data.room?.code) setRoomCode(data.room.code);
+    };
+    const onRoomError = (data) => setError(data?.message || 'Room error');
+    const onGameStarted = (data) => {
       onStartMultiplayerGame(data.room, data.currentQuestion, data.letter);
-    });
+    };
+
+    socket.off('room-created', onRoomCreated).on('room-created', onRoomCreated);
+    socket.off('player-joined', onPlayerJoined).on('player-joined', onPlayerJoined);
+    socket.off('room-updated', onRoomUpdated).on('room-updated', onRoomUpdated);
+    socket.off('player-left', onPlayerLeft).on('player-left', onPlayerLeft);
+    socket.off('room-error', onRoomError).on('room-error', onRoomError);
+    socket.off('game-started', onGameStarted).on('game-started', onGameStarted);
 
     return () => {
-      socket.off('room-created');
-      socket.off('player-joined');
-      socket.off('room-updated');
-      socket.off('player-left');
-      socket.off('room-error');
-      socket.off('game-started');
+      socket.off('room-created', onRoomCreated);
+      socket.off('player-joined', onPlayerJoined);
+      socket.off('room-updated', onRoomUpdated);
+      socket.off('player-left', onPlayerLeft);
+      socket.off('room-error', onRoomError);
+      socket.off('game-started', onGameStarted);
     };
   }, [socket, onStartMultiplayerGame]);
+
+  // When landing back in the lobby (Play Again), re-join + request latest snapshot
+  useEffect(() => {
+    if (!socket || !user?.username) return;
+    if (roomCode) {
+      const code = roomCode.toUpperCase();
+      socket.emit('join-room', { roomCode: code, username: user.username });
+      socket.emit('get-room',  { roomCode: code }); // safe no-op if unsupported
+    }
+  }, [socket, user?.username, roomCode]);
 
   const joinRoom = () => {
     if (!user?.username) {
       setError('Please log in to join a room');
       return;
     }
-
     if (!joinCode.trim()) {
       setError('Please enter a room code');
       return;
     }
-
-    socket.emit('join-room', {
-      roomCode: joinCode.toUpperCase(),
-      username: user.username
-    });
-
-    setRoomCode(joinCode.toUpperCase());
+    const code = joinCode.toUpperCase();
+    socket.emit('join-room', { roomCode: code, username: user.username });
+    setRoomCode(code);
     setError('');
   };
 
   const toggleReady = () => {
-    socket.emit('toggle-ready', { roomCode });
+    const code = (room?.code || roomCode || '').toUpperCase();
+    if (!code) return;
+    socket.emit('toggle-ready', { roomCode: code });
   };
 
   const startGame = () => {
     if (!isHost) return;
-    socket.emit('start-game', { roomCode });
+    const code = (room?.code || roomCode || '').toUpperCase();
+    if (!code) {
+      setError('Missing room code. Please re-join the room.');
+      return;
+    }
+    // If the server still thinks the old game is running, reset first (safe no-op otherwise)
+    socket.emit('reset-room', { roomCode: code });
+    // Make sure server has the current difficulty
+    if (room?.difficulty) {
+      socket.emit('update-difficulty', { roomCode: code, difficulty: room.difficulty });
+    }
+    // Start!
+    socket.emit('start-game', { roomCode: code });
   };
 
   const leaveRoom = () => {
-    socket.emit('leave-room', { roomCode });
+    const code = (room?.code || roomCode || '').toUpperCase();
+    if (code) socket.emit('leave-room', { roomCode: code });
     setRoom(null);
     setRoomCode('');
     setJoinCode('');
@@ -88,10 +137,9 @@ function MultiplayerLobby({ socket, onBack, onStartMultiplayerGame, mode, room: 
     onBack();
   };
 
-  const currentPlayer = room?.players.find(p => p.username === user?.username);
-  const allReady = room?.players.every(p => p.ready) && room?.players.length >= 2;
+  const currentPlayer = room?.players?.find(p => p.username === user?.username);
+  const allReady = Boolean(room?.players?.length >= 2 && room.players.every(p => p.ready));
 
-  // If room doesn't exist yet
   if (!room) {
     return (
       <div className="flex flex-col items-center p-8 text-white">
@@ -131,7 +179,7 @@ function MultiplayerLobby({ socket, onBack, onStartMultiplayerGame, mode, room: 
       <h2 className="text-4xl font-bold mb-4">Room Lobby</h2>
 
       <div className="mb-6 text-center">
-        <div className="text-2xl font-bold mb-2">Room Code: {roomCode}</div>
+        <div className="text-2xl font-bold mb-2">Room Code: {room?.code || roomCode}</div>
         <div className="text-sm text-gray-300">Share this code with your friends!</div>
         <div className="text-lg mt-2">Difficulty: {room.difficulty}</div>
       </div>
@@ -150,7 +198,8 @@ function MultiplayerLobby({ socket, onBack, onStartMultiplayerGame, mode, room: 
                   checked={room.difficulty === level}
                   onChange={() => {
                     setSelectedDifficulty(level);
-                    socket.emit('update-difficulty', { roomCode, difficulty: level });
+                    const code = (room?.code || roomCode || '').toUpperCase();
+                    if (code) socket.emit('update-difficulty', { roomCode: code, difficulty: level });
                   }}
                   className="hidden"
                 />

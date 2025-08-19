@@ -14,6 +14,7 @@ import MultiplayerLobby from './components/MultiplayerLobby';
 import MultiplayerGame from './components/MultiplayerGame';
 import MultiplayerResults from './components/MultiplayerResults';
 
+import config from './config/environment.js';
 import "./assets/styles.css";
 
 function formatHMS(ms) {
@@ -24,7 +25,6 @@ function formatHMS(ms) {
   return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 }
 
-// Milliseconds until next 00:00 UTC (matches backend daily reset)
 function msUntilNextUtcMidnight() {
   const now = new Date();
   const nextUtcMidnight = new Date(Date.UTC(
@@ -38,77 +38,105 @@ function msUntilNextUtcMidnight() {
 
 function App() {
   const [currentView, setCurrentView] = useState('start');
-  const [previousView, setPreviousView] = useState('start');
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [multiplayerRoom, setMultiplayerRoom] = useState(null);
   const [multiplayerResults, setMultiplayerResults] = useState(null);
   const [multiplayerMode, setMultiplayerMode] = useState(null);
 
-  // ✅ Countdown state for daily challenge
-  const [dailyRemainingMs, setDailyRemainingMs] = useState(msUntilNextUtcMidnight());
-  useEffect(() => {
-    const id = setInterval(() => setDailyRemainingMs(msUntilNextUtcMidnight()), 1000);
-    return () => clearInterval(id);
-  }, []);
+  const [viewStack, setViewStack] = useState(['start']);
+  const pushView = (view) => { setViewStack((prev) => [...prev, view]); setCurrentView(view); };
+  const popView = () => {
+    setViewStack((prev) => {
+      if (prev.length <= 1) return prev;
+      const next = prev.slice(0, -1);
+      setCurrentView(next[next.length - 1]);
+      return next;
+    });
+  };
+  const resetToHome = () => { setViewStack(['start']); setCurrentView('start'); };
 
-  // ✅ Pull everything (including socket) from context
+  const [dailyRemainingMs, setDailyRemainingMs] = useState(msUntilNextUtcMidnight());
+  useEffect(() => { const id = setInterval(() => setDailyRemainingMs(msUntilNextUtcMidnight()), 1000); return () => clearInterval(id); }, []);
+
   const {
     startGame,
     startDailyChallenge,
     selectedDifficulty,
     setSelectedDifficulty,
     user,
-    logout,
-    socket, // <-- use this instead of creating one here
+    logout: contextLogout,
+    socket,
   } = useContext(GameContext);
 
-  const handleNavigate = (view) => {
-    if (['leaderboard', 'howto'].includes(view)) setPreviousView(currentView);
-    setCurrentView(view);
-  };
+  const [hasPlayedDaily, setHasPlayedDaily] = useState(localStorage.getItem('gr_dailyPlayed_' + new Date().toISOString().slice(0,10)) === '1');
+  useEffect(() => { setHasPlayedDaily(localStorage.getItem('gr_dailyPlayed_' + new Date().toISOString().slice(0,10)) === '1'); }, [dailyRemainingMs]);
 
-  const handleBack = () => setCurrentView(previousView);
+  useEffect(() => {
+    const checkDaily = async () => {
+      try {
+        if (user?.id) {
+          const res = await fetch(`${config.API_URL}/daily-status?userId=${user.id}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.playedToday) {
+              localStorage.setItem('gr_dailyPlayed_' + new Date().toISOString().slice(0,10), '1');
+              setHasPlayedDaily(true);
+              return;
+            }
+          }
+        }
+        setHasPlayedDaily(localStorage.getItem('gr_dailyPlayed_' + new Date().toISOString().slice(0,10)) === '1');
+      } catch {
+        setHasPlayedDaily(localStorage.getItem('gr_dailyPlayed_' + new Date().toISOString().slice(0,10)) === '1');
+      }
+    };
+    checkDaily();
+  }, [user, dailyRemainingMs]);
 
-  const handleStartGame = () => {
-    if (startGame) startGame(selectedDifficulty);
-    setCurrentView('game');
-  };
+  const handleNavigate = (view) => pushView(view);
+  const handleBack = () => popView();
 
+  const logout = () => { contextLogout?.(); resetToHome(); };
+
+  const handleStartGame = () => { if (startGame) startGame(selectedDifficulty); pushView('game'); };
   const handleDailyChallengeStart = () => {
+    if (hasPlayedDaily) return;
     if (startDailyChallenge) startDailyChallenge();
-    setCurrentView('game');
+    localStorage.setItem('gr_dailyPlayed_' + new Date().toISOString().slice(0,10), '1');
+    setHasPlayedDaily(true);
+    pushView('game');
   };
+  const handlePlayAgain = () => { if (startGame) startGame(selectedDifficulty); pushView('game'); };
 
-  const handlePlayAgain = () => {
-    if (startGame) startGame(selectedDifficulty);
-    setCurrentView('game');
-  };
+  const handleStartMultiplayerGame = (room) => { setMultiplayerRoom(room); pushView('multiplayer-game'); };
+  const handleMultiplayerGameEnd = (results) => { setMultiplayerResults(results); pushView('multiplayer-results'); };
 
-  const handleStartMultiplayerGame = (room) => {
-    setMultiplayerRoom(room);
-    setCurrentView('multiplayer-game');
-  };
-
-  const handleMultiplayerGameEnd = (results) => {
-    setMultiplayerResults(results);
-    setCurrentView('multiplayer-results');
-  };
-
+  // ✅ RESULTS → LOBBY (Play Again): go back to the SAME lobby (code + difficulty)
   const handleBackToMultiplayerLobby = () => {
     setMultiplayerResults(null);
-    setCurrentView('multiplayer-lobby');
+    if (multiplayerRoom) {
+      // Replace stack with Start → Lobby to ensure clean nav and correct screen
+      setViewStack(['start', 'multiplayer-lobby']);
+      setCurrentView('multiplayer-lobby');
+    } else {
+      // Fallback (shouldn't normally happen): just push lobby
+      pushView('multiplayer-lobby');
+    }
   };
 
+  // ✅ RESULTS → START (Leave Game): leave room & go home
   const handleBackToMainMenu = () => {
+    // Let lobby handle actual socket leave when user hits "Leave Room" there,
+    // but to guarantee leaving immediately you could also emit here if desired.
     setMultiplayerRoom(null);
     setMultiplayerResults(null);
-    setCurrentView('start');
+    resetToHome();
   };
 
   const handleCreateRoom = () => {
     if (socket && user?.username) {
       setMultiplayerMode('create');
-      setCurrentView('multiplayer-lobby');
+      pushView('multiplayer-lobby');
       socket.emit('create-room', {
         username: user.username,
         difficulty: selectedDifficulty
@@ -117,18 +145,13 @@ function App() {
       setShowLoginModal(true);
     }
   };
-
-  const handleJoinRoom = () => {
-    setMultiplayerMode('join');
-    setCurrentView('multiplayer-lobby');
-  };
+  const handleJoinRoom = () => { setMultiplayerMode('join'); pushView('multiplayer-lobby'); };
 
   const showCircle = !['howto', 'leaderboard', 'multiplayer-results', 'multiplayer-lobby'].includes(currentView);
   const showSideCards = ['start', 'summary'].includes(currentView);
 
   return (
     <>
-      {/* Make sure starbackground.mp4 lives in /public */}
       <video src="/starbackground.mp4" muted loop autoPlay playsInline id="background-video" />
       <div id="blue-tint" />
       {showCircle && currentView !== 'multiplayer-game' && <LetterCircles />}
@@ -148,10 +171,11 @@ function App() {
                 <h2 className="text-xl font-bold mb-2">🌍 Daily Challenge</h2>
                 <button
                   id="daily-button"
-                  className="big-play-button w-full mb-4"
+                  className="big-play-button w-full mb-4 disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={handleDailyChallengeStart}
+                  disabled={hasPlayedDaily}
                 >
-                  Play
+                  {hasPlayedDaily ? 'Played – Come back tomorrow' : 'Play'}
                 </button>
                 <div className="mt-1 text-sm text-white/90">
                   <div className="font-semibold">
@@ -159,6 +183,7 @@ function App() {
                   </div>
                 </div>
               </div>
+
               <div className="card">
                 <h2>👥 Multiplayer</h2>
                 <p>Challenge your friends!</p>
@@ -216,7 +241,7 @@ function App() {
         )}
 
         {currentView === 'game' && (
-          <Game onEndGame={() => setCurrentView('summary')} />
+          <Game onEndGame={() => pushView('summary')} />
         )}
 
         {currentView === 'multiplayer-game' && (
@@ -234,7 +259,7 @@ function App() {
         {currentView === 'multiplayer-lobby' && (
           <MultiplayerLobby
             socket={socket}
-            onBack={() => setCurrentView('start')}
+            onBack={handleBack}
             onStartMultiplayerGame={handleStartMultiplayerGame}
             mode={multiplayerMode}
             room={multiplayerRoom}
@@ -246,8 +271,6 @@ function App() {
             results={multiplayerResults}
             onBackToLobby={handleBackToMultiplayerLobby}
             onBackToMenu={handleBackToMainMenu}
-            socket={socket}
-            roomCode={multiplayerRoom?.code}
           />
         )}
 

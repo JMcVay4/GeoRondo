@@ -141,7 +141,6 @@ const questionBank = {
         { "question": "U.S. city in North Carolina known for its research triangle", "correctAnswers": ["Chapel Hill"], "difficulty": "hard" },
         { "question": "Country in Africa with Yaoundé as capital", "correctAnswers": ["Cameroon"], "difficulty": "hard" },
         { "question": "City in Mexico known for its Mayan ruins", "correctAnswers": ["Chichen Itza"], "difficulty": "hard" },
-        { "question": "European country known for its neutrality", "correctAnswers": ["Switzerland"], "difficulty": "easy" },
         { "question": "City in Illinois known for its deep-dish pizza", "correctAnswers": ["Chicago"], "difficulty": "easy" },
         { "question": "African country with Praia as capital", "correctAnswers": ["Cape Verde"], "difficulty": "hard" },
         { "question": "U.S. city in South Carolina known for its historic district", "correctAnswers": ["Charleston"], "difficulty": "medium" },
@@ -223,7 +222,7 @@ const questionBank = {
         { "question": "City in Oregon known for its craft beer scene", "correctAnswers": ["Eugene"], "difficulty": "medium" },
         { "question": "Island in the Mediterranean known for its ancient ruins", "correctAnswers": ["Euboea", "Evia"], "difficulty": "grandmaster" },
         { "question": "City in Alberta known for its oil industry", "correctAnswers": ["Edmonton"], "difficulty": "medium" },
-        { "question": "City in Turkey with a historic castle", "correctAnswers": ["grandmaster"], "difficulty": "hard" },
+        { "question": "City in Turkey known for ancient Greek ruins and the Temple of Artemis", "correctAnswers": ["Ephesus"], "difficulty": "grandmaster" },
         { "question": "Island in the Pacific with mysterious statues", "correctAnswers": ["Easter Island"], "difficulty": "medium" },
         { "question": "City in Germany with a historic cathedral", "correctAnswers": ["Essen"], "difficulty": "hard" }
     ],
@@ -274,7 +273,7 @@ const questionBank = {
         { "question": "Danish territory in North America", "correctAnswers": ["Greenland"], "difficulty": "medium" }, 
         { "question": "Small mountain range in western Texas", "correctAnswers": ["Guadalupe", "Guadalupe Mountains"], "difficulty": "hard" },
         { "question": "Country with the world's only natural nuclear reactor", "correctAnswers": ["Gabon"], "difficulty": "grandmaster" },
-        { "question": "Famous bridge located in California", "correctAnswers": ["Golden Gate Bridge"], "difficulty": "easy" }, 
+        { "question": "Famous bridge located in California", "correctAnswers": ["Golden Gate Bridge", "Golden Gate"], "difficulty": "easy" }, 
         { "question": "1983 US invasion site known as the \”Spice Isle\”", "correctAnswers": ["Grenada"], "difficulty": "hard" },
         { "question": "Country known for the Rock and as a British overseas territory", "correctAnswers": ["Gibraltar"], "difficulty": "medium" },
         { "question": "Island in the Caribbean known for its nutmeg", "correctAnswers": ["Grenada"], "difficulty": "hard" },
@@ -445,7 +444,7 @@ const questionBank = {
         { "question": "U.S. state with big sky country", "correctAnswers": ["Montana"], "difficulty": "medium" },
         { "question": "Canadian city with French flair", "correctAnswers": ["Montreal"], "difficulty": "medium" },
         { "question": "Italian city with a fashion runway", "correctAnswers": ["Milan"], "difficulty": "medium" },
-        { "question": "African nation with Lake Malawi", "correctAnswers": ["Malawi"], "difficulty": "hard" },
+        { "question": "African nation with Lake Malawi", "correctAnswers": ["Malawi"], "difficulty": "medium" },
         { "question": "Florida city with a Latin beat", "correctAnswers": ["Miami"], "difficulty": "easy" },
         { "question": "Russian capital known for the Red Square", "correctAnswers": ["Moscow"], "difficulty": "easy" }
     ],
@@ -478,7 +477,8 @@ const questionBank = {
         { "question": "Tennessee city with a country music beat", "correctAnswers": ["Nashville"], "difficulty": "easy" },
         { "question": "Louisiana city with a Mardi Gras spirit", "correctAnswers": ["New Orleans"], "difficulty": "easy" },
         { "question": "Pacific territory with Saipan", "correctAnswers": ["Northern Mariana Islands"], "difficulty": "hard" },
-        { "question": "English city with a medieval charm", "correctAnswers": ["Norwich"], "difficulty": "hard" }
+        { "question": "English city with a medieval charm", "correctAnswers": ["Norwich"], "difficulty": "hard" },
+        { "question": "State in Australia with Alice Springs", "correctAnswers": ["North Territory", "Northern Territory"], "difficulty": "medium" },
     ],
     'O': [
         { "question": "Capital city in the midwest of America", "correctAnswers": ["Omaha"], "difficulty": "medium" },
@@ -594,7 +594,6 @@ const questionBank = {
         
     ],
     'S': [
-        { "question": "State in Australia with Alice Springs", "correctAnswers": ["South Australia"], "difficulty": "medium" },
         { "question": "South American country whose official language is Dutch", "correctAnswers": ["Suriname"], "difficulty": "hard" },
         { "question": "Italian island home to Palermo", "correctAnswers": ["Sicily", "Sicilia"], "difficulty": "hard" },
         { "question": "Yemeni island known for its unique dragon blood trees", "correctAnswers": ["Socotra", "Socotra Island"], "difficulty": "grandmaster" },
@@ -616,6 +615,7 @@ const questionBank = {
         { "question": "Country in the Balkans where NBA superstar Nikola Jokic is from", "correctAnswers": ["Serbia"], "difficulty": "hard" },
         { "question": "Country in South America where capital city Paramaribo is located", "correctAnswers": ["Suriname"], "difficulty": "hard" },
         { "question": "Asian island nation known as the Teardrop of India", "correctAnswers": ["Sri Lanka"], "difficulty": "hard" },
+        { "question": "European country known for its neutrality", "correctAnswers": ["Switzerland"], "difficulty": "easy" },
 
     ],
     'T': [
@@ -646,22 +646,20 @@ const questionBank = {
         { "question": "Country home to Kyiv and Lviv", "correctAnswers": ["Ukraine"], "difficulty": "medium" },
         { "question": "Country with the most traffic lights", "correctAnswers": ["United States", "US", "USA", "Freedom"], "difficulty": "hard" },
         { "question": "Capital of the Russian Bashkortostan republic", "correctAnswers": ["Ufa"], "difficulty": "grandmaster" },
-        { "question": "Cuntry associated with the Bald Eagle", "correctAnswers": ["United States", "US", "USA"], "difficulty": "easy" },
+        { "question": "Country associated with the Bald Eagle", "correctAnswers": ["United States", "US", "USA"], "difficulty": "easy" },
         { "question": "U.S. state known for the Great Salt Lake", "correctAnswers": ["Utah"], "difficulty": "medium" },
         { "question": "South American country where capital city Montevideo is located", "correctAnswers": ["Uruguay"], "difficulty": "medium" },
         { "question": "Country in Central Asia with capital Tashkent", "correctAnswers": ["Uzbekistan"], "difficulty": "hard" },
         { "question": "City in Sweden historically considered its secondary capital", "correctAnswers": ["Uppsala"], "difficulty": "grandmaster" },
         { "question": "Country in the Middle East where Ajman is located", "correctAnswers": ["United Arab Emirates", "UAE"], "difficulty": "hard" },
         { "question": "Country made up of England, Scotland, Wales and Northern Ireland", "correctAnswers": ["UK", "United Kingdom"], "difficulty": "easy" },
-        { "question": "Country home to the most olympic medals", "correctAnswers": ["US", "United States"], "difficulty": "easy" },
+        { "question": "Country home to the most olympic medals", "correctAnswers": ["US", "United States", "USA"], "difficulty": "easy" },
         { "question": "A massive sandstone monolith in the Northern Territories of Australia", "correctAnswers": ["Uluru"], "difficulty": "grandmaster" },
         { "question": "Town referred to as Bali's culture capital", "correctAnswers": ["Ubud"], "difficulty": "hard" },
         { "question": "Capital city located in Mongolia", "correctAnswers": ["Ulaanbaatar"], "difficulty": "medium" },
         { "question": "South African town located on the banks of the Orange River", "correctAnswers": ["Upington"], "difficulty": "grandmaster" },
         { "question": "Largest and busiest motion picture and TV studio in the world featuring a theme park in Orlando Florida", "correctAnswers": ["Universal", "Universal Studios"], "difficulty": "easy" },
         { "question": "Provincial capital city in northeast Thailand", "correctAnswers": ["Udon Thani"], "difficulty": "grandmaster" },
-
-    
 
     ],  
     'V': [
@@ -706,7 +704,7 @@ const questionBank = {
         { "question": "Capital of Mexico's Veracruz", "correctAnswers": ["Xalapa"], "difficulty": "hard" },
         { "question": "Capital of Shaanxi Province in central China", "correctAnswers": ["Xi'an"], "difficulty": "grandmaster" },
         { "question": "Contains X: Country containing the cities of Villahermosa and Tampico", "correctAnswers": ["Mexico"], "difficulty": "medium" },
-        { "question": "Contains X: European country where the cities of Remich and Vianden are located", "correctAnswers": ["Luxembourg"], "difficulty": "medium" },
+        { "question": "Contains X: European country where the cities of Remich and Vianden are located", "correctAnswers": ["Luxembourg"], "difficulty": "hard" },
         { "question": "Contains X: Capital city in the Southwestern United States", "correctAnswers": ["Phoenix"], "difficulty": "easy" },
         { "question": "Contains X: U.S. state which the Armadillo and Longhorn are state mammals", "correctAnswers": ["Texas"], "difficulty": "medium" },
         { "question": "Contains X: U.S. state where Dallas is located", "correctAnswers": ["Texas"], "difficulty": "easy" },

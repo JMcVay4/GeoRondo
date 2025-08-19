@@ -772,7 +772,6 @@ td {
   }
 }
 
-/* Ensure responsive behavior for all screen sizes */
 body, html, #root {
   width: 100vw;
   min-height: 100vh;

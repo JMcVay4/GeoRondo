@@ -1,6 +1,4 @@
 // server.js
-
-// import { execSync } from "child_process";
 const express = require('express');
 const cors = require('cors');
 const { PrismaClient } = require('@prisma/client');
@@ -15,7 +13,9 @@ const questionBank = rawQuestions.default || rawQuestions;
 const app = express();
 const server = http.createServer(app);
 
-// --- Allowed origins helper (define FIRST) ---
+// --- NEW: alphabet for server-side bookkeeping of answers ---
+const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+
 const getAllowedOrigins = () => {
   if (process.env.NODE_ENV === 'production') {
     const list =
@@ -25,10 +25,8 @@ const getAllowedOrigins = () => {
   return ['http://localhost:5173', 'http://localhost:5174'];
 };
 
-// Compute once and reuse everywhere
 const allowedOrigins = getAllowedOrigins();
 
-// Debug (shows up in Render logs)
 console.log('NODE_ENV:', process.env.NODE_ENV);
 console.log('Allowed origins:', allowedOrigins);
 
@@ -38,7 +36,6 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 const rooms = new Map();
 
-// --- Express CORS (incl. preflight) ---
 app.use(
   cors({
     origin: allowedOrigins,
@@ -47,12 +44,10 @@ app.use(
     credentials: true,
   })
 );
-// Optional explicit preflight (cors() already handles it, but harmless)
 app.options('*', cors({ origin: allowedOrigins, credentials: true }));
 
 app.use(express.json());
 
-// --- Socket.IO (CORS must match) ---
 const io = new Server(server, {
   cors: {
     origin: allowedOrigins,
@@ -105,6 +100,25 @@ app.post('/auth/google', async (req, res) => {
   }
 });
 
+// --- NEW: daily status endpoint (has the user played today?) ---
+app.get('/daily-status', async (req, res) => {
+  try {
+    const userId = parseInt(req.query.userId, 10);
+    if (!userId) return res.status(400).json({ error: 'Missing userId' });
+
+    const today = new Date().toISOString().slice(0, 10);
+    const difficulty = `daily-${today}`;
+    const existing = await prisma.score.findFirst({
+      where: { userId, difficulty },
+    });
+
+    res.json({ playedToday: !!existing, today });
+  } catch (err) {
+    console.error('Daily status error:', err);
+    res.status(500).json({ error: 'Failed to fetch daily status' });
+  }
+});
+
 app.post('/submit', async (req, res) => {
   const { score, time, difficulty, userId } = req.body;
 
@@ -119,6 +133,25 @@ app.post('/submit', async (req, res) => {
       where: { userId: parseInt(userId), difficulty: finalDifficulty },
     });
 
+    // --- NEW: lock daily to a single submission per day
+    if (finalDifficulty.startsWith('daily-')) {
+      if (existingScore) {
+        return res
+          .status(409)
+          .json({ error: 'Already played today. Come back tomorrow!' });
+      }
+      await prisma.score.create({
+        data: {
+          score,
+          time,
+          difficulty: finalDifficulty,
+          userId: parseInt(userId),
+        },
+      });
+      return res.json({ message: 'Daily score submitted!' });
+    }
+
+    // Non-daily: keep "better score" logic
     if (existingScore) {
       if (score > existingScore.score || (score === existingScore.score && time < existingScore.time)) {
         await prisma.score.update({
@@ -189,7 +222,7 @@ io.on('connection', (socket) => {
     const room = {
       code: roomCode,
       host: username,
-      players: [{ username, socketId: socket.id, ready: false, score: 0, finished: false }],
+      players: [{ username, socketId: socket.id, ready: false, score: 0, finished: false, playerAnswers: [] }],
       difficulty,
       gameStarted: false,
       currentQuestionIndex: 0,
@@ -212,7 +245,7 @@ io.on('connection', (socket) => {
       return socket.emit('room-error', { message: 'Username already taken' });
     }
 
-    room.players.push({ username, socketId: socket.id, ready: false, score: 0, finished: false });
+    room.players.push({ username, socketId: socket.id, ready: false, score: 0, finished: false, playerAnswers: [] });
     socket.join(roomCode);
     io.to(roomCode).emit('player-joined', { room });
   });
@@ -239,7 +272,7 @@ io.on('connection', (socket) => {
       player.finished = false;
       player.finalScore = 0;
       player.timeUsed = 0;
-      player.playerAnswers = [];
+      player.playerAnswers = [];       // keep clean for next round
       player.score = 0;
     });
 
@@ -276,7 +309,7 @@ io.on('connection', (socket) => {
     const player = room.players.find((p) => p.socketId === socket.id);
     if (!player || player.username !== room.host) return;
 
-    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+    const alphabet = ALPHABET;
     room.questions = alphabet.map((letter) => {
       const pool = (questionBank[letter] || []).filter((q) => q.difficulty === room.difficulty);
       if (pool.length > 0) return pool[Math.floor(Math.random() * pool.length)];
@@ -285,6 +318,9 @@ io.on('connection', (socket) => {
         ? allPool[Math.floor(Math.random() * allPool.length)]
         : { question: `Name a place that starts with "${letter}"`, correctAnswers: ['Any answer'], difficulty: room.difficulty };
     });
+
+    // reset scores/answers just in case
+    room.players.forEach(p => { p.score = 0; p.finished = false; p.playerAnswers = []; });
 
     room.gameStarted = true;
     room.gameState = 'playing';
@@ -307,9 +343,20 @@ io.on('connection', (socket) => {
 
     const currentQuestion = room.questions[questionIndex];
     const isCorrect = currentQuestion.correctAnswers.some(
-      (correct) => correct.toLowerCase() === answer.toLowerCase()
+      (correct) => correct.toLowerCase() === String(answer || '').toLowerCase()
     );
     if (isCorrect) player.score++;
+
+    // --- NEW: persist the player's answer server-side too ---
+    if (!player.playerAnswers) player.playerAnswers = [];
+    const letter = ALPHABET[questionIndex] || '?';
+    player.playerAnswers.push({
+      letter,
+      question: currentQuestion.question,
+      userAnswer: String(answer || ''),
+      wasCorrect: isCorrect,
+      correctAnswers: currentQuestion.correctAnswers
+    });
 
     io.to(roomCode).emit('player-answered', {
       username: player.username,
@@ -329,7 +376,13 @@ io.on('connection', (socket) => {
       player.finished = true;
       player.finalScore = finalScore;
       player.timeUsed = timeUsed;
-      player.playerAnswers = data.answers || [];
+
+      // Use provided answers if available, otherwise fall back to what we collected during play
+      if (Array.isArray(data.answers) && data.answers.length) {
+        player.playerAnswers = data.answers;
+      } else if (!Array.isArray(player.playerAnswers)) {
+        player.playerAnswers = [];
+      }
 
       const allFinished = room.players.every((p) => p.finished);
       if (allFinished) {
@@ -356,12 +409,12 @@ io.on('connection', (socket) => {
     const { roomCode } = data;
     const room = rooms.get(roomCode);
     if (room) {
+      const leaving = room.players.find((p) => p.socketId === socket.id);
       room.players = room.players.filter((p) => p.socketId !== socket.id);
       if (room.players.length === 0) {
         rooms.delete(roomCode);
       } else {
-        const leavingPlayer = room.players.find((p) => p.socketId === socket.id);
-        if (leavingPlayer?.username === room.host) room.host = room.players[0].username;
+        if (leaving?.username === room.host) room.host = room.players[0].username;
         socket.leave(roomCode);
         io.to(roomCode).emit('player-left', { room });
       }

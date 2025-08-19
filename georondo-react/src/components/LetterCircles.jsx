@@ -17,16 +17,11 @@ function useRingSize(forced) {
   const calc = () => {
     if (forced) return forced;
     if (typeof window === "undefined") return 900;
-
     const vmin = Math.min(window.innerWidth, window.innerHeight);
-    // bump up slightly from 0.82 → 0.87
     const raw = vmin * 0.87;
-
     return Math.max(580, Math.min(1250, Math.round(raw)));
   };
-
   const [size, setSize] = useState(calc);
-
   useEffect(() => {
     if (forced) {
       setSize(forced);
@@ -36,7 +31,6 @@ function useRingSize(forced) {
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, [forced]);
-
   return size;
 }
 
@@ -44,37 +38,31 @@ export default function LetterCircles({
   customAlphabet,
   customCurrentLetterIndex,
   customPlayerAnswers,
-  customSkippedLetters,
-  customSkipMode,
   ringDiameter,
 }) {
-  const { alphabet, currentLetterIndex, playerAnswers, skippedLetters, skipMode } = useGame();
+  const { alphabet, currentLetterIndex, playerAnswers } = useGame();
 
   const finalAlphabet = customAlphabet || alphabet;
   const finalCurrentLetterIndex =
     customCurrentLetterIndex !== undefined ? customCurrentLetterIndex : currentLetterIndex;
   const finalPlayerAnswers = customPlayerAnswers || playerAnswers;
-  const finalSkippedLetters = customSkippedLetters || skippedLetters;
-  const finalSkipMode = customSkipMode !== undefined ? customSkipMode : skipMode;
 
   const cssForced = resolveForcedDiameter();
   const forced = ringDiameter || cssForced || null;
   const containerSize = useRingSize(forced);
 
-  // bump letters just a little too: 0.062 → 0.066
   const letterSize = Math.max(42, Math.round(containerSize * 0.066));
   const radius = containerSize * 0.46;
   const center = containerSize / 2;
 
-  const getStatus = (index) => {
-    if (index === finalCurrentLetterIndex) return "active";
-    const answer = finalPlayerAnswers.find((ans) => ans.letter === finalAlphabet[index]);
-    if (answer) {
-      if (answer.wasCorrect) return "completed";
-      if (answer.userAnswer === "") return "skipped";
-      return "incorrect";
-    }
-    return "";
+  // Background status strictly from recorded answers
+  const getBgStatus = (index) => {
+    const letter = finalAlphabet[index];
+    const answer = finalPlayerAnswers.find((ans) => ans.letter === letter);
+    if (!answer) return "";
+    if (answer.wasCorrect) return "completed";
+    if (answer.userAnswer === "") return "skipped";
+    return "incorrect";
   };
 
   return (
@@ -97,12 +85,17 @@ export default function LetterCircles({
         const angleRad = (angleDeg * Math.PI) / 180;
         const x = center + radius * Math.cos(angleRad) - letterSize / 2;
         const y = center + radius * Math.sin(angleRad) - letterSize / 2;
-        const status = getStatus(index);
+
+        const bgStatus = getBgStatus(index);
+        const isActive = index === finalCurrentLetterIndex;
+
+        // White border when the active letter is a blue "skipped" circle, otherwise deepskyblue
+        const borderColor = bgStatus === "skipped" ? "#fff" : "deepskyblue";
 
         return (
           <div
             key={letter}
-            className={`letter${status ? " " + status : ""}`}
+            className={`letter${bgStatus ? " " + bgStatus : ""}`}
             style={{
               position: "absolute",
               left: `${Math.round(x)}px`,
@@ -115,10 +108,9 @@ export default function LetterCircles({
               justifyContent: "center",
               fontWeight: "bold",
               fontSize: `${Math.round(letterSize * 0.5)}px`,
-              border:
-                status === "active"
-                  ? `${Math.max(3, Math.round(letterSize * 0.09))}px solid deepskyblue`
-                  : undefined,
+              border: isActive
+                ? `${Math.max(3, Math.round(letterSize * 0.09))}px solid ${borderColor}`
+                : undefined,
             }}
           >
             {letter}
