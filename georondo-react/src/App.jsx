@@ -163,44 +163,44 @@ function App() {
         onNavigate={handleNavigate}
       />
 
-      <div className="max-w-7xl mx-auto px-4">
+      <div className="app-shell max-w-7xl mx-auto px-4">
         {showSideCards && (
-          <div className="dashboard-container">
-            <div className="sidebar left">
-              <div className="card">
-                <h2 className="text-xl font-bold mb-2">🌍 Daily Challenge</h2>
+          <div className="dashboard-container home-dashboard">
+            <div className="sidebar left home-sidebar">
+              <div className="card home-card home-card--daily">
+                <h2 className="home-card-title">Daily Challenge</h2>
                 <button
                   id="daily-button"
-                  className="big-play-button w-full mb-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="big-play-button home-card-action w-full mb-4 disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={handleDailyChallengeStart}
                   disabled={hasPlayedDaily}
                 >
-                  {hasPlayedDaily ? 'Played – Come back tomorrow' : 'Play'}
+                  {hasPlayedDaily ? 'Played - Come back tomorrow' : 'Play'}
                 </button>
-                <div className="mt-1 text-sm text-white/90">
+                <div className="home-card-meta mt-1 text-sm text-white/90">
                   <div className="font-semibold">
                     Next Daily Challenge in: {formatHMS(dailyRemainingMs)}
                   </div>
                 </div>
               </div>
 
-              <div className="card">
-                <h2>👥 Multiplayer</h2>
+              <div className="card home-card home-card--multiplayer">
+                <h2 className="home-card-title">Multiplayer</h2>
                 <p>Challenge your friends!</p>
                 {user?.username ? (
                   <div className="button-row">
-                    <button onClick={handleCreateRoom} className="big-play-button">Create Room</button>
-                    <button onClick={handleJoinRoom} className="big-play-button">Join Room</button>
+                    <button onClick={handleCreateRoom} className="big-play-button home-card-action">Create Room</button>
+                    <button onClick={handleJoinRoom} className="big-play-button home-card-action">Join Room</button>
                   </div>
                 ) : (
-                  <button id="multiplayer-button" className="big-play-button" onClick={() => setShowLoginModal(true)}>
+                  <button id="multiplayer-button" className="big-play-button home-card-action" onClick={() => setShowLoginModal(true)}>
                     Login Required
                   </button>
                 )}
               </div>
             </div>
 
-            <div className="main-menu">
+            <div className="main-menu home-main-panel">
               {currentView === 'start' && (
                 <>
                   <h1 className="title">GeoRondo</h1>
@@ -228,11 +228,11 @@ function App() {
               {currentView === 'summary' && <GameOverMenu onPlayAgain={handlePlayAgain} />}
             </div>
 
-            <div className="sidebar right">
-              <div className="card">
-                <h2>Leaderboard</h2>
+            <div className="sidebar right home-sidebar">
+              <div className="card home-card home-card--leaderboard">
+                <h2 className="home-card-title">Leaderboard</h2>
                 <p>See today's top GeoRondo players</p>
-                <button id="show-leaderboard" className="big-play-button" onClick={() => handleNavigate('leaderboard')}>
+                <button id="show-leaderboard" className="big-play-button home-card-action" onClick={() => handleNavigate('leaderboard')}>
                   View
                 </button>
               </div>

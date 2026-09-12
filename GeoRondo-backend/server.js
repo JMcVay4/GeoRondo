@@ -16,13 +16,25 @@ const server = http.createServer(app);
 // --- NEW: alphabet for server-side bookkeeping of answers ---
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
+const normalizeOrigin = (value) => {
+  const trimmed = value.trim();
+  const withoutAssignment = trimmed.replace(/^[A-Z0-9_]+\s*=\s*/i, '').trim();
+  const markdownLink = withoutAssignment.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+  return (markdownLink ? markdownLink[2] : withoutAssignment).replace(/^<|>$/g, '').trim();
+};
+
 const getAllowedOrigins = () => {
   if (process.env.NODE_ENV === 'production') {
     const list =
       process.env.FRONTEND_URL || 'https://georondo.com,https://www.georondo.com';
-    return list.split(',').map((s) => s.trim());
+    return [...new Set(list.split(',').map(normalizeOrigin).filter(Boolean))];
   }
-  return ['http://localhost:5173', 'http://localhost:5174'];
+  return [
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:5174',
+  ];
 };
 
 const allowedOrigins = getAllowedOrigins();
@@ -61,13 +73,23 @@ app.post('/auth/google', async (req, res) => {
   const { token } = req.body;
   console.log('Google auth request received');
 
+  if (!GOOGLE_CLIENT_ID) {
+    return res.status(500).json({ error: 'Missing GOOGLE_CLIENT_ID on the backend' });
+  }
+
+  let payload;
   try {
     const ticket = await client.verifyIdToken({
       idToken: token,
       audience: GOOGLE_CLIENT_ID,
     });
+    payload = ticket.getPayload();
+  } catch (error) {
+    console.error('Google token verification error:', error);
+    return res.status(401).json({ error: 'Invalid Google token' });
+  }
 
-    const payload = ticket.getPayload();
+  try {
     const { sub: googleId, email, name, picture } = payload;
 
     let user = await prisma.user.findUnique({ where: { googleId } });
@@ -95,8 +117,8 @@ app.post('/auth/google', async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Google auth error:', error);
-    res.status(401).json({ error: 'Invalid Google token' });
+    console.error('Google user persistence error:', error);
+    res.status(500).json({ error: 'Google sign-in reached the backend, but the database connection failed' });
   }
 });
 

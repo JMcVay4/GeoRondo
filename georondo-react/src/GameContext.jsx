@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import io from 'socket.io-client';
 import questionBank from './questions';
 import config from './config/environment.js';
@@ -102,7 +102,7 @@ export const GameProvider = ({ children }) => {
     setCurrentView('start');
   };
 
-  const handleGoogleSignIn = async (response) => {
+  const handleGoogleSignIn = useCallback(async (response) => {
     try {
       const res = await fetch(`${config.API_URL}/auth/google`, {
         method: 'POST',
@@ -120,13 +120,24 @@ export const GameProvider = ({ children }) => {
         };
         setUser(userObject);
         localStorage.setItem('user', JSON.stringify(userObject));
+        return { ok: true };
       } else {
-        console.error('Google sign-in failed');
+        let errorMessage = 'Google sign-in failed on the backend.';
+        try {
+          const data = await res.json();
+          if (data?.error) errorMessage = data.error;
+        } catch {}
+        console.error('Google sign-in failed:', res.status, errorMessage);
+        return {
+          ok: false,
+          error: `${errorMessage} (${res.status})`,
+        };
       }
     } catch (error) {
       console.error('Google sign-in error:', error);
+      return { ok: false, error: 'Could not reach the backend sign-in endpoint.' };
     }
-  };
+  }, []);
 
   const submitScore = async (score, timeUsed, difficulty) => {
     if (!user || !user.id) {
